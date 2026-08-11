@@ -324,15 +324,19 @@ func TestParseRejectsUnknownInputKind(t *testing.T) {
 
 func TestCheckedInFixtures(t *testing.T) {
 	tests := []struct {
-		name string
-		kind mtc.InputKind
-		want mtc.ArtifactKind
+		name           string
+		kind           mtc.InputKind
+		wantKind       mtc.ArtifactKind
+		wantProof      bool
+		wantStart      uint64
+		wantEnd        uint64
+		wantSignatures int
 	}{
-		{"draft05-ca.pem", mtc.InputCertificate, mtc.ArtifactCA},
-		{"draft05-standalone.pem", mtc.InputCertificate, mtc.ArtifactSubscriber},
-		{"draft05-landmark.pem", mtc.InputCertificate, mtc.ArtifactSubscriber},
-		{"draft05-subscriber-tbs.pem", mtc.InputTBSCertificate, mtc.ArtifactSubscriber},
-		{"cqrp-subscriber.pem", mtc.InputCertificate, mtc.ArtifactSubscriber},
+		{name: "draft05-ca.pem", kind: mtc.InputCertificate, wantKind: mtc.ArtifactCA},
+		{name: "draft05-standalone.pem", kind: mtc.InputCertificate, wantKind: mtc.ArtifactSubscriber, wantProof: true, wantStart: 1, wantEnd: 2, wantSignatures: 2},
+		{name: "draft05-landmark.pem", kind: mtc.InputCertificate, wantKind: mtc.ArtifactSubscriber, wantProof: true, wantStart: 1, wantEnd: 2},
+		{name: "draft05-subscriber-tbs.pem", kind: mtc.InputTBSCertificate, wantKind: mtc.ArtifactSubscriber},
+		{name: "cqrp-subscriber.pem", kind: mtc.InputCertificate, wantKind: mtc.ArtifactSubscriber, wantProof: true, wantStart: 0, wantEnd: 8},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -348,8 +352,23 @@ func TestCheckedInFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got.Kind != tc.want {
-				t.Fatalf("kind = %v, want %v", got.Kind, tc.want)
+			if got.Kind != tc.wantKind {
+				t.Fatalf("kind = %v, want %v", got.Kind, tc.wantKind)
+			}
+			if !tc.wantProof {
+				if got.Proof != nil || got.ProofParseError != nil {
+					t.Fatalf("proof/error = %#v/%v, want neither", got.Proof, got.ProofParseError)
+				}
+				return
+			}
+			if got.Proof == nil || got.ProofParseError != nil {
+				t.Fatalf("proof/error = %#v/%v, want decoded proof", got.Proof, got.ProofParseError)
+			}
+			if got.Proof.Start != tc.wantStart || got.Proof.End != tc.wantEnd {
+				t.Fatalf("proof range = [%d,%d), want [%d,%d)", got.Proof.Start, got.Proof.End, tc.wantStart, tc.wantEnd)
+			}
+			if len(got.Proof.Signatures) != tc.wantSignatures {
+				t.Fatalf("proof signatures = %d, want %d", len(got.Proof.Signatures), tc.wantSignatures)
 			}
 		})
 	}

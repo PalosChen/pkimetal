@@ -70,24 +70,26 @@ func TestParseProofAcceptsZeroLengthVectors(t *testing.T) {
 func TestParseProofReportsTypedTruncation(t *testing.T) {
 	prefix := proofThroughInclusion(nil)
 	tests := []struct {
-		name  string
-		input []byte
-		field string
+		name      string
+		input     []byte
+		field     string
+		needed    int
+		available int
 	}{
-		{"extensions prefix", []byte{0}, "extensions length"},
-		{"extensions payload", []byte{0, 1}, "extensions"},
-		{"extension type", []byte{0, 1, 0}, "extension type"},
-		{"extension data prefix", []byte{0, 3, 0, 1, 0}, "extension data length"},
-		{"extension data payload", []byte{0, 5, 0, 1, 0, 2, 0xff}, "extension data"},
-		{"start uint48", append([]byte{0, 0}, make([]byte, 5)...), "start"},
-		{"end uint48", append(append([]byte{0, 0}, make([]byte, 6)...), make([]byte, 5)...), "end"},
-		{"inclusion proof prefix", append(append(append([]byte{0, 0}, make([]byte, 6)...), make([]byte, 6)...), 0), "inclusion_proof length"},
-		{"inclusion proof payload", proofThroughInclusion([]byte{0, 2, 0xff}), "inclusion_proof"},
-		{"signatures prefix", appendProofBytes(prefix, 0), "signatures length"},
-		{"signatures payload", appendProofBytes(prefix, 0, 2, 0), "signatures"},
-		{"cosigner ID payload", appendProofBytes(prefix, 0, 2, 2, 0xaa), "cosigner ID"},
-		{"signature prefix", appendProofBytes(prefix, 0, 3, 1, 0xaa, 0), "signature length"},
-		{"signature payload", appendProofBytes(prefix, 0, 5, 1, 0xaa, 0, 2, 0xbb), "signature"},
+		{"extensions prefix", []byte{0}, "extensions length", 2, 1},
+		{"extensions payload", []byte{0, 1}, "extensions", 1, 0},
+		{"extension type", []byte{0, 1, 0}, "extension type", 2, 1},
+		{"extension data prefix", []byte{0, 3, 0, 1, 0}, "extension data length", 2, 1},
+		{"extension data payload", []byte{0, 5, 0, 1, 0, 2, 0xff}, "extension data", 2, 1},
+		{"start uint48", append([]byte{0, 0}, make([]byte, 5)...), "start", 6, 5},
+		{"end uint48", append(append([]byte{0, 0}, make([]byte, 6)...), make([]byte, 5)...), "end", 6, 5},
+		{"inclusion proof prefix", append(append(append([]byte{0, 0}, make([]byte, 6)...), make([]byte, 6)...), 0), "inclusion_proof length", 2, 1},
+		{"inclusion proof payload", proofThroughInclusion([]byte{0, 2, 0xff}), "inclusion_proof", 2, 1},
+		{"signatures prefix", appendProofBytes(prefix, 0), "signatures length", 2, 1},
+		{"signatures payload", appendProofBytes(prefix, 0, 2, 0), "signatures", 2, 1},
+		{"cosigner ID payload", appendProofBytes(prefix, 0, 2, 2, 0xaa), "cosigner ID", 2, 1},
+		{"signature prefix", appendProofBytes(prefix, 0, 3, 1, 0xaa, 0), "signature length", 2, 1},
+		{"signature payload", appendProofBytes(prefix, 0, 5, 1, 0xaa, 0, 2, 0xbb), "signature", 2, 1},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -99,6 +101,9 @@ func TestParseProofReportsTypedTruncation(t *testing.T) {
 			if truncation.Field != tc.field {
 				t.Fatalf("truncation field = %q, want %q", truncation.Field, tc.field)
 			}
+			if truncation.Needed != tc.needed || truncation.Available != tc.available {
+				t.Fatalf("truncation byte counts = needed %d, available %d; want %d/%d", truncation.Needed, truncation.Available, tc.needed, tc.available)
+			}
 		})
 	}
 }
@@ -109,6 +114,43 @@ func TestParseProofReportsTypedTrailingData(t *testing.T) {
 	var trailing *mtc.ProofTrailingDataError
 	if !errors.As(err, &trailing) {
 		t.Fatalf("error = %T %v, want *mtc.ProofTrailingDataError", err, err)
+	}
+	if trailing.Remaining != 1 {
+		t.Fatalf("trailing bytes = %d, want 1", trailing.Remaining)
+	}
+}
+
+func TestParseProofDoesNotAliasInput(t *testing.T) {
+	want := mtctest.Proof{
+		Extensions:     []mtctest.ProofExtension{{Type: 1, Data: []byte{0x11, 0x12}}},
+		Start:          4,
+		End:            8,
+		InclusionProof: []byte{0x21, 0x22},
+		Signatures: []mtctest.ProofSignature{{
+			CosignerID: []byte{0x31, 0x32},
+			Signature:  []byte{0x41, 0x42},
+		}},
+	}
+	input := mtctest.ProofBytes(want)
+	got, err := mtc.ParseProof(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range input {
+		input[i] ^= 0xff
+	}
+
+	if !bytes.Equal(got.Extensions[0].Data, want.Extensions[0].Data) {
+		t.Fatalf("extension data changed after source mutation: %x", got.Extensions[0].Data)
+	}
+	if !bytes.Equal(got.InclusionProof, want.InclusionProof) {
+		t.Fatalf("inclusion proof changed after source mutation: %x", got.InclusionProof)
+	}
+	if !bytes.Equal(got.Signatures[0].CosignerID, want.Signatures[0].CosignerID) {
+		t.Fatalf("cosigner ID changed after source mutation: %x", got.Signatures[0].CosignerID)
+	}
+	if !bytes.Equal(got.Signatures[0].Signature, want.Signatures[0].Signature) {
+		t.Fatalf("signature changed after source mutation: %x", got.Signatures[0].Signature)
 	}
 }
 
