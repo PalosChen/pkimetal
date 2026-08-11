@@ -125,7 +125,7 @@ every input will trigger the finding.
 | Code | Source | Section | Artifact / profile | Input applicability | Severity | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | `e_mtc_profile_artifact_mismatch` | pkimetal profile dispatch | Explicit MTC profile selection | CA or subscriber / all four MTC profiles | Certificate and TBS | error | implemented |
-| `b_mtc_rule_panic` | pkimetal native rule runner | Panic recovery | Any registered native MTC rule | Rule applicability | bug | implemented |
+| `b_mtc_rule_panic` | inherited from panicking rule (`Rule.Source`) | inherited from panicking rule (`Rule.Section`) | Any registered native MTC rule | Rule applicability | bug | implemented |
 
 ## Requirement-level coverage without finding codes
 

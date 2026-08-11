@@ -1,11 +1,13 @@
 openapi: 3.0.0
 info:
-  title: pkimetal API
-  description: PKI Meta-Linter
+  title: pkimetal Experimental MTC Fork API
+  description: >-
+    API definition for a separately deployed experimental pkimetal fork with
+    MTC draft-05 and CQRP v0.2.0 linting. It does not describe capabilities of
+    the upstream hosted services or container images.
   contact:
-    name: Rob Stradling
-    email: rob@sectigo.com
-    url: https://github.com/pkimetal/pkimetal/blob/main/README.md#about-this-project
+    name: Upstream pkimetal project (base implementation)
+    url: https://github.com/pkimetal/pkimetal
   license:
     name: GNU General Public License v3.0 or later
     url: https://spdx.org/licenses/GPL-3.0-or-later.html
@@ -14,12 +16,8 @@ info:
 security: []
 
 servers:
-  - url: https://pkimet.al
-    description: Stable API server
-  - url: https://dev.pkimet.al
-    description: Development API server
   - url: http://localhost:8080
-    description: Local API server
+    description: Experimental local fork deployment
 
 paths:
   /lintcert:

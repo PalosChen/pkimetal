@@ -8,7 +8,9 @@ A REST API and web interface that integrates multiple linters to perform pre- an
 > Use the explicit `mtc_ca`, `mtc_subscriber`, `cqrp_mtc_ca`, or
 > `cqrp_mtc_subscriber` profile with `/lintcert` or `/linttbscert`. See the
 > [MTC and CQRP rule coverage](doc/MTC_RULE_COVERAGE.md) for exact scope and
-> offline limitations.
+> offline limitations. Upstream container images and the public services at
+> `pkimet.al` and `dev.pkimet.al` do not expose these fork-only MTC/CQRP features;
+> build and deploy this fork separately to use them.
 
 At a glance:
 
@@ -83,6 +85,8 @@ Special-purpose linters:
 
 [Docker containers](https://github.com/orgs/pkimetal/packages?repo_name=pkimetal) are pre-built automatically and published on the Github Container Repository (GHCR). Two different release cycles are provided:
 
+The upstream GHCR images described below do not expose these fork-only MTC/CQRP features. A separately built image from this fork is required for MTC or CQRP linting.
+
 - [Stable](https://github.com/pkimetal/pkimetal/pkgs/container/pkimetal) releases: These have a "vX.X.X" tag on GHCR and are automatically built and published whenever a corresponding [pkimetal release](https://github.com/pkimetal/pkimetal/releases) is created. The most recent Stable release also receives the "latest" tag. Since Stable releases track versioned releases of each linter project (wherever possible), **only Stable releases are recommended for production usage**.
 - [Development](https://github.com/pkimetal/pkimetal/pkgs/container/pkimetal-dev) releases: These have a "YYYYMMDDHHMMSS" tag on GHCR and are automatically built and published whenever a corresponding [commit](https://github.com/pkimetal/pkimetal/commits/main/) is pushed to the "main" branch. Since Development releases also track the latest commits to the "main"/"master" branch of each linter project, they are NOT RECOMMENDED for production usage.
 
@@ -92,6 +96,8 @@ Sectigo provides public instances of pkimetal that correspond to the two release
 
 - Stable: https://pkimet.al/
 - Development: https://dev.pkimet.al/
+
+These upstream public instances do not expose these fork-only MTC/CQRP features. They must not be used as MTC or CQRP endpoints for this fork.
 
 These public instances are provided as-is, on a best effort basis. They are NOT RECOMMENDED for production usage by CAs, because (due to Ballot SC-75) they may be seen as Delegated Third Parties. Your own deployment of the [Docker container](#docker-containers) for the latest Stable release is the appropriate way to deploy pkimetal in a production CA environment.
 

@@ -69,6 +69,10 @@ func TestRuleCoverageDocument(t *testing.T) {
 		t.Fatalf("read rule coverage document: %v", err)
 	}
 	body := string(document)
+	panicMetadata := "| `b_mtc_rule_panic` | inherited from panicking rule (`Rule.Source`) | inherited from panicking rule (`Rule.Section`) |"
+	if !strings.Contains(body, panicMetadata) {
+		t.Errorf("panic coverage row does not document inherited source and section metadata")
+	}
 	codes := append(draftCodes, cqrpCodes...)
 	codes = append(codes, "e_mtc_profile_artifact_mismatch", "b_mtc_rule_panic")
 	for _, code := range codes {
@@ -101,6 +105,44 @@ func TestRuleCoverageDocument(t *testing.T) {
 		if !validStatuses[status] {
 			t.Errorf("coverage row %d has invalid status %q", lineNumber+1, status)
 		}
+	}
+}
+
+func TestExperimentalDeploymentDocumentation(t *testing.T) {
+	read := func(path string) string {
+		t.Helper()
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		return string(contents)
+	}
+
+	readme := read("../README.md")
+	for _, section := range []string{"Experimental MTC fork", "## Docker containers", "## Public instances"} {
+		start := strings.Index(readme, section)
+		if start < 0 {
+			t.Errorf("README lacks %q section", section)
+			continue
+		}
+		end := strings.Index(readme[start+len(section):], "\n## ")
+		body := readme[start:]
+		if end >= 0 {
+			body = readme[start : start+len(section)+end]
+		}
+		if !strings.Contains(body, "do not expose these fork-only MTC/CQRP features") {
+			t.Errorf("README %q section lacks fork deployment disclaimer", section)
+		}
+	}
+
+	openapi := read("../doc/openapi.yaml")
+	for _, upstream := range []string{"https://pkimet.al", "https://dev.pkimet.al"} {
+		if strings.Contains(openapi, upstream) {
+			t.Errorf("OpenAPI advertises upstream server %s for this fork", upstream)
+		}
+	}
+	if !strings.Contains(openapi, "description: Experimental local fork deployment") {
+		t.Error("OpenAPI lacks an experimental local deployment server description")
 	}
 }
 
