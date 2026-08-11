@@ -170,7 +170,7 @@ func TestDraft05RegistersEveryRequiredRule(t *testing.T) {
 			t.Errorf("duplicate rule %q", rule.Code)
 		}
 		want[rule.Code] = true
-		if rule.Source == "" || rule.Section == "" || len(rule.Kinds) == 0 || len(rule.InputKinds) == 0 || rule.Evaluate == nil {
+		if rule.Code == "" || rule.Source == "" || rule.Section == "" || len(rule.Kinds) == 0 || len(rule.InputKinds) == 0 || rule.Evaluate == nil {
 			t.Errorf("rule %q has incomplete metadata or applicability: %#v", rule.Code, rule)
 		}
 	}

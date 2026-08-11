@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/asn1"
 	"math/big"
+	"math/bits"
 )
 
 const (
@@ -99,11 +100,11 @@ var draft05Rules = []Rule{
 		return nil
 	}),
 	draftRule("e_mtc_ca_key_cert_sign_missing", "5.5", caKinds, bothInputKinds, func(a *Artifact) *Finding {
-		extension, ok := firstExtension(a, oidKeyUsage)
-		if !ok {
+		extensions := matchingExtensions(a, oidKeyUsage)
+		if len(extensions) != 1 {
 			return nil
 		}
-		if !keyCertSignSet(extension.Value) {
+		if !keyCertSignSet(extensions[0].Value) {
 			return errorFinding("tbsCertificate.extensions.keyUsage", "key usage does not assert keyCertSign")
 		}
 		return nil
@@ -115,16 +116,19 @@ var draft05Rules = []Rule{
 		return nil
 	}),
 	draftRule("e_mtc_ca_basic_constraints_not_ca", "5.5", caKinds, bothInputKinds, func(a *Artifact) *Finding {
-		extension, ok := firstExtension(a, oidBasicConstraints)
-		if !ok {
+		extensions := matchingExtensions(a, oidBasicConstraints)
+		if len(extensions) != 1 {
 			return nil
 		}
-		if !basicConstraintsCA(extension.Value) {
+		if !basicConstraintsCA(extensions[0].Value) {
 			return errorFinding("tbsCertificate.extensions.basicConstraints", "basic constraints does not set cA to TRUE")
 		}
 		return nil
 	}),
 	draftRule("w_mtc_ca_ski_not_ca_id", "5.5", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+		if len(a.SubjectCAID) == 0 {
+			return nil
+		}
 		for _, extension := range matchingExtensions(a, oidSubjectKeyIdentifier) {
 			if !subjectKeyIdentifierMatches(extension.Value, a.SubjectCAID) {
 				return warningFinding("tbsCertificate.extensions.subjectKeyIdentifier", "subject key identifier does not encode the CA ID")
@@ -300,6 +304,11 @@ func LintDraft05ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
 	}
 	local := *artifact
 	local.Kind = expected
+	local.Proof = nil
+	local.ProofParseError = nil
+	if expected == ArtifactSubscriber && local.InputKind == InputCertificate {
+		local.Proof, local.ProofParseError = ParseProof(local.SignatureValue)
+	}
 	return runRules(&local, draft05Rules)
 }
 
@@ -357,22 +366,17 @@ func countExtensions(artifact *Artifact, oid asn1.ObjectIdentifier) int {
 	return count
 }
 
-func firstExtension(artifact *Artifact, oid asn1.ObjectIdentifier) (Extension, bool) {
-	for _, extension := range artifact.Extensions {
-		if extension.ID.Equal(oid) {
-			return extension, true
-		}
-	}
-	return Extension{}, false
-}
-
 func keyCertSignSet(input []byte) bool {
 	value, err := parseExactDER(input)
 	if err != nil {
 		return false
 	}
-	bits, _, err := parseBitString(value, "keyUsage")
-	return err == nil && len(bits) != 0 && bits[0]&0x04 != 0
+	namedBits, unused, err := parseBitString(value, "keyUsage")
+	if err != nil || len(namedBits) == 0 {
+		return false
+	}
+	last := namedBits[len(namedBits)-1]
+	return last != 0 && unused == bits.TrailingZeros8(last) && namedBits[0]&0x04 != 0
 }
 
 func basicConstraintsCA(input []byte) bool {

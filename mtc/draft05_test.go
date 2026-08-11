@@ -124,6 +124,60 @@ func TestLintDraft05ForKindHandlesNilAndUnsupportedKind(t *testing.T) {
 	}
 }
 
+func TestLintDraft05ForKindRebuildsSubscriberProofState(t *testing.T) {
+	validProof := mtctest.ProofBytes(mtctest.ValidProof())
+	tests := []struct {
+		name      string
+		template  mtctest.Template
+		wantCodes []string
+	}{
+		{
+			name:      "unknown with valid proof",
+			template:  explicitUnknownSubscriberTemplate(validProof),
+			wantCodes: []string{"e_mtc_signature_algorithm_oid", "e_mtc_subscriber_issuer_not_ca_id"},
+		},
+		{
+			name:      "unknown with malformed proof",
+			template:  explicitUnknownSubscriberTemplate(mtctest.MalformedProofBytes()),
+			wantCodes: []string{"e_mtc_signature_algorithm_oid", "e_mtc_subscriber_issuer_not_ca_id", "f_mtc_proof_malformed"},
+		},
+		{
+			name:      "CA with valid proof",
+			template:  explicitCASubscriberTemplate(validProof),
+			wantCodes: nil,
+		},
+		{
+			name:      "CA with malformed proof",
+			template:  explicitCASubscriberTemplate(mtctest.MalformedProofBytes()),
+			wantCodes: []string{"f_mtc_proof_malformed"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			artifact := parseArtifact(t, mtctest.Certificate(tc.template), mtc.InputCertificate)
+			if artifact.Kind == mtc.ArtifactSubscriber || artifact.Proof != nil || artifact.ProofParseError != nil {
+				t.Fatalf("precondition kind/proof/error = %v/%#v/%v", artifact.Kind, artifact.Proof, artifact.ProofParseError)
+			}
+			findings := lintForKindWithoutMutation(t, artifact, mtc.ArtifactSubscriber)
+			assertOnlyCodes(t, findings, tc.wantCodes...)
+		})
+	}
+}
+
+func TestLintDraft05ForKindRunsSubscriberProofSemanticRules(t *testing.T) {
+	tpl := explicitCASubscriberTemplate(mtctest.ProofBytes(mtctest.Proof{Start: 4, End: 9}))
+	artifact := parseArtifact(t, mtctest.Certificate(tpl), mtc.InputCertificate)
+	findings := lintForKindWithoutMutation(t, artifact, mtc.ArtifactSubscriber)
+	assertOnlyCodes(t, findings, "e_mtc_proof_subtree_invalid")
+}
+
+func TestLintDraft05ForKindDoesNotParseProofForTBS(t *testing.T) {
+	tpl := explicitCASubscriberTemplate(mtctest.MalformedProofBytes())
+	artifact := parseArtifact(t, mtctest.TBSCertificate(tpl), mtc.InputTBSCertificate)
+	findings := lintForKindWithoutMutation(t, artifact, mtc.ArtifactSubscriber)
+	assertOnlyCodes(t, findings)
+}
+
 func TestDraft05CASerialRangeBoundaries(t *testing.T) {
 	max := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 64), big.NewInt(1))
 	for _, tc := range []struct {
@@ -144,6 +198,33 @@ func TestDraft05CASerialRangeBoundaries(t *testing.T) {
 	}
 }
 
+func TestDraft05KeyUsageNamedBitListCanonicality(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		value       []byte
+		wantFinding bool
+	}{
+		{"single keyCertSign bit", []byte{0x03, 0x02, 0x02, 0x04}, false},
+		{"multiple first-octet bits", []byte{0x03, 0x02, 0x02, 0x84}, false},
+		{"multiple octets", []byte{0x03, 0x03, 0x07, 0x04, 0x80}, false},
+		{"trailing zero octet", []byte{0x03, 0x03, 0x00, 0x04, 0x00}, true},
+		{"nonminimal unused count", []byte{0x03, 0x02, 0x00, 0x04}, true},
+		{"nonzero unused bits", []byte{0x03, 0x02, 0x03, 0x04}, true},
+		{"invalid unused count", []byte{0x03, 0x01, 0x08}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := mtctest.ValidCATemplate()
+			mtctest.ReplaceExtension(&tpl, mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: tc.value})
+			findings := mtc.LintDraft05(parseArtifact(t, mtctest.Certificate(tpl), mtc.InputCertificate))
+			if tc.wantFinding {
+				assertOnlyCodes(t, findings, "e_mtc_ca_key_cert_sign_missing")
+			} else {
+				assertOnlyCodes(t, findings)
+			}
+		})
+	}
+}
+
 func TestDraft05ValidSKIEncodesCAID(t *testing.T) {
 	tpl := mtctest.ValidCATemplate()
 	tpl.Extensions = append(tpl.Extensions, mtctest.Extension{
@@ -151,6 +232,42 @@ func TestDraft05ValidSKIEncodesCAID(t *testing.T) {
 	})
 	artifact := parseArtifact(t, mtctest.Certificate(tpl), mtc.InputCertificate)
 	assertNoCode(t, mtc.LintDraft05(artifact), "w_mtc_ca_ski_not_ca_id")
+}
+
+func TestDraft05SKIWarningRequiresParsedSubjectCAID(t *testing.T) {
+	tpl := mtctest.ValidCATemplate()
+	tpl.Subject = mtctest.ValidSubscriberTemplate().Subject
+	tpl.Issuer = mtctest.ValidCAIDNameDER()
+	tpl.Extensions = append(tpl.Extensions, mtctest.Extension{
+		ID: mtctest.OIDSubjectKeyID, Value: mtctest.SubjectKeyIdentifierDER([]byte("wrong")),
+	})
+	findings := mtc.LintDraft05(parseArtifact(t, mtctest.Certificate(tpl), mtc.InputCertificate))
+	assertOnlyCodes(t, findings, "e_mtc_ca_subject_not_ca_id")
+}
+
+func TestDraft05DuplicateCAExtensionContentChecksAreOrderIndependent(t *testing.T) {
+	goodKeyUsage := mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(true)}
+	badKeyUsage := mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(false)}
+	goodBasicConstraints := mtctest.Extension{ID: mtctest.OIDBasicConstraints, Critical: true, Value: mtctest.BasicConstraintsDER(true)}
+	badBasicConstraints := mtctest.Extension{ID: mtctest.OIDBasicConstraints, Critical: true, Value: mtctest.BasicConstraintsDER(false)}
+	for _, tc := range []struct {
+		name       string
+		oid        asn1.ObjectIdentifier
+		extensions []mtctest.Extension
+	}{
+		{"key usage good then bad", mtctest.OIDKeyUsage, []mtctest.Extension{goodKeyUsage, badKeyUsage}},
+		{"key usage bad then good", mtctest.OIDKeyUsage, []mtctest.Extension{badKeyUsage, goodKeyUsage}},
+		{"basic constraints good then bad", mtctest.OIDBasicConstraints, []mtctest.Extension{goodBasicConstraints, badBasicConstraints}},
+		{"basic constraints bad then good", mtctest.OIDBasicConstraints, []mtctest.Extension{badBasicConstraints, goodBasicConstraints}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := mtctest.ValidCATemplate()
+			mtctest.RemoveExtension(&tpl, tc.oid)
+			tpl.Extensions = append(tpl.Extensions, tc.extensions...)
+			findings := mtc.LintDraft05(parseArtifact(t, mtctest.Certificate(tpl), mtc.InputCertificate))
+			assertOnlyCodes(t, findings)
+		})
+	}
 }
 
 func TestDraft05SubscriberRules(t *testing.T) {
@@ -220,6 +337,62 @@ func TestDraft05SubscriberRules(t *testing.T) {
 					}
 				}
 			}
+		})
+	}
+}
+
+func TestDraft05RepresentativeMutationsHaveExactFindingSets(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		template  mtctest.Template
+		wantCodes []string
+	}{
+		{
+			name: "CA extension not critical",
+			template: mutateTemplate(mtctest.ValidCATemplate(), func(x *mtctest.Template) {
+				mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDMTC_CA, Value: mtctest.ValidCAExtensionDER()})
+			}),
+			wantCodes: []string{"e_mtc_ca_extension_not_critical"},
+		},
+		{
+			name: "CA serial range reversed",
+			template: mutateTemplate(mtctest.ValidCATemplate(), func(x *mtctest.Template) {
+				replaceCARange(big.NewInt(10), big.NewInt(9))(x)
+			}),
+			wantCodes: []string{"e_mtc_ca_serial_range_invalid"},
+		},
+		{
+			name: "subscriber serial zero",
+			template: mutateTemplate(mtctest.ValidSubscriberTemplate(), func(x *mtctest.Template) {
+				x.Serial = big.NewInt(0)
+			}),
+			wantCodes: []string{"e_mtc_serial_non_positive"},
+		},
+		{
+			name: "subscriber proof malformed",
+			template: mutateTemplate(mtctest.ValidSubscriberTemplate(), func(x *mtctest.Template) {
+				x.Signature = mtctest.MalformedProofBytes()
+			}),
+			wantCodes: []string{"f_mtc_proof_malformed"},
+		},
+		{
+			name: "subscriber proof extension duplicate",
+			template: mutateTemplate(mtctest.ValidSubscriberTemplate(), withProof(func(p *mtctest.Proof) {
+				p.Extensions = []mtctest.ProofExtension{{Type: 1}, {Type: 1}}
+			})),
+			wantCodes: []string{"e_mtc_proof_extensions_duplicate"},
+		},
+		{
+			name: "unsigned CA signature not empty",
+			template: mutateTemplate(mtctest.ValidUnsignedCATemplate(), func(x *mtctest.Template) {
+				x.Signature = []byte{1}
+			}),
+			wantCodes: []string{"e_rfc9925_unsigned_signature_not_empty"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			artifact := parseArtifact(t, mtctest.Certificate(tc.template), mtc.InputCertificate)
+			assertOnlyCodes(t, mtc.LintDraft05(artifact), tc.wantCodes...)
 		})
 	}
 }
@@ -333,6 +506,11 @@ func withProof(mutate func(*mtctest.Proof)) func(*mtctest.Template) {
 	}
 }
 
+func mutateTemplate(template mtctest.Template, mutate func(*mtctest.Template)) mtctest.Template {
+	mutate(&template)
+	return template
+}
+
 func parseArtifact(t *testing.T, input []byte, kind mtc.InputKind) *mtc.Artifact {
 	t.Helper()
 	artifact, err := mtc.Parse(input, kind)
@@ -382,4 +560,70 @@ func cloneExtensions(extensions []mtc.Extension) []mtc.Extension {
 		cloned[i].Value = append([]byte(nil), extension.Value...)
 	}
 	return cloned
+}
+
+func explicitUnknownSubscriberTemplate(signature []byte) mtctest.Template {
+	tpl := mtctest.ValidCATemplate()
+	mtctest.RemoveExtension(&tpl, mtctest.OIDMTC_CA)
+	tpl.Serial = new(big.Int).SetUint64((1 << 48) | 7)
+	tpl.Signature = append([]byte(nil), signature...)
+	return tpl
+}
+
+func explicitCASubscriberTemplate(signature []byte) mtctest.Template {
+	tpl := mtctest.ValidCATemplate()
+	tpl.Serial = new(big.Int).SetUint64((1 << 48) | 7)
+	tpl.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDMTCProof}
+	tpl.OuterSignature = mtctest.Algorithm{OID: mtctest.OIDMTCProof}
+	tpl.Issuer = mtctest.ValidCAIDNameDER()
+	tpl.Signature = append([]byte(nil), signature...)
+	return tpl
+}
+
+func lintForKindWithoutMutation(t *testing.T, artifact *mtc.Artifact, expected mtc.ArtifactKind) []mtc.Finding {
+	t.Helper()
+	originalKind := artifact.Kind
+	originalProof := artifact.Proof
+	originalProofError := artifact.ProofParseError
+	originalSignature := append([]byte(nil), artifact.SignatureValue...)
+	originalExtensions := cloneExtensions(artifact.Extensions)
+
+	findings := mtc.LintDraft05ForKind(artifact, expected)
+	if artifact.Kind != originalKind || artifact.Proof != originalProof || artifact.ProofParseError != originalProofError ||
+		!bytes.Equal(artifact.SignatureValue, originalSignature) || !reflect.DeepEqual(artifact.Extensions, originalExtensions) {
+		t.Fatalf("LintDraft05ForKind mutated caller artifact: %#v", artifact)
+	}
+	return findings
+}
+
+func assertOnlyCodes(t *testing.T, findings []mtc.Finding, want ...string) {
+	t.Helper()
+	got := make([]string, len(findings))
+	for i, finding := range findings {
+		got[i] = finding.Code
+		var wantSeverity mtc.Severity
+		switch {
+		case strings.HasPrefix(finding.Code, "w_"):
+			wantSeverity = mtc.Warning
+		case strings.HasPrefix(finding.Code, "e_"):
+			wantSeverity = mtc.Error
+		case strings.HasPrefix(finding.Code, "b_"):
+			wantSeverity = mtc.Bug
+		case strings.HasPrefix(finding.Code, "f_"):
+			wantSeverity = mtc.Fatal
+		default:
+			t.Fatalf("finding code has no stable severity prefix: %#v", finding)
+		}
+		if finding.Severity != wantSeverity {
+			t.Fatalf("%s severity = %v, want %v", finding.Code, finding.Severity, wantSeverity)
+		}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("finding codes = %v, want %v; findings = %#v", got, want, findings)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("finding codes = %v, want %v; findings = %#v", got, want, findings)
+		}
+	}
 }
