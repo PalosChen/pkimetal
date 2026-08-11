@@ -325,16 +325,23 @@ func parseImplicitBitString(value derValue, field string) ([]byte, int, error) {
 }
 
 func classifyArtifact(artifact *Artifact) {
+	var caExtensionValue []byte
+	caExtensionCount := 0
 	for _, extension := range artifact.Extensions {
 		if !extension.ID.Equal(OIDMTCCertificationAuthority) {
 			continue
 		}
-		artifact.Kind = ArtifactCA
-		if artifact.CAParameters == nil && artifact.CAExtensionError == nil {
-			artifact.CAParameters, artifact.CAExtensionError = ParseCertificationAuthorityExtension(extension.Value)
-		}
+		caExtensionCount++
+		caExtensionValue = extension.Value
 	}
-	if artifact.Kind == ArtifactCA {
+	if caExtensionCount != 0 {
+		artifact.Kind = ArtifactCA
+		if caExtensionCount == 1 {
+			artifact.CAParameters, artifact.CAExtensionError = ParseCertificationAuthorityExtension(caExtensionValue)
+		} else {
+			artifact.CAParameters = nil
+			artifact.CAExtensionError = fmt.Errorf("duplicate MTC CA extensions: found %d", caExtensionCount)
+		}
 		return
 	}
 	if len(artifact.IssuerCAID) != 0 || artifact.TBSSignature.Algorithm.Equal(OIDMTCProof) {

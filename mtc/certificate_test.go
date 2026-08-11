@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pkimetal/pkimetal/internal/mtctest"
@@ -100,6 +101,15 @@ func TestParseDistinguishesAbsentAndNULLParameters(t *testing.T) {
 	}
 }
 
+func TestParseRejectsEOCAlgorithmParameters(t *testing.T) {
+	tpl := mtctest.ValidSubscriberTemplate()
+	tpl.SPKIAlgorithm.ParametersPresent = true
+	tpl.SPKIAlgorithm.Parameters = []byte{0x00, 0x00}
+	if _, err := mtc.Parse(mtctest.Certificate(tpl), mtc.InputCertificate); err == nil {
+		t.Fatal("Parse accepted EOC AlgorithmIdentifier parameters")
+	}
+}
+
 func TestParseRetainsNonByteAlignedSignature(t *testing.T) {
 	tpl := mtctest.ValidSubscriberTemplate()
 	tpl.Signature = []byte{0xaa, 0xa8}
@@ -140,6 +150,51 @@ func TestParseMalformedCAExtensionRemainsLintable(t *testing.T) {
 	}
 	if got.CAParameters != nil || got.CAExtensionError == nil {
 		t.Fatalf("CA parameters/error = %+v/%v", got.CAParameters, got.CAExtensionError)
+	}
+}
+
+func TestParseDuplicateMTCCAExtensionsRemainLintable(t *testing.T) {
+	valid := mtctest.ValidCAExtensionDER()
+	malformed := []byte{0x30, 0x80, 0x00, 0x00}
+	differentValid := mtctest.CAExtensionDER(
+		mtctest.Algorithm{OID: mtctest.OIDSHA256},
+		mtctest.Algorithm{OID: mtctest.OIDMLDSA65},
+		big.NewInt(200),
+		big.NewInt(500),
+	)
+	tests := []struct {
+		name   string
+		values [][]byte
+	}{
+		{"valid then malformed", [][]byte{valid, malformed}},
+		{"malformed then valid", [][]byte{malformed, valid}},
+		{"differing valid duplicates", [][]byte{valid, differentValid}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := mtctest.ValidCATemplate()
+			tpl.Extensions = nil
+			for _, value := range tc.values {
+				tpl.Extensions = append(tpl.Extensions, mtctest.Extension{
+					ID:       mtctest.OIDMTC_CA,
+					Critical: true,
+					Value:    value,
+				})
+			}
+			got, err := mtc.Parse(mtctest.Certificate(tpl), mtc.InputCertificate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Kind != mtc.ArtifactCA {
+				t.Fatalf("kind = %v", got.Kind)
+			}
+			if got.CAParameters != nil {
+				t.Fatalf("CAParameters = %+v", got.CAParameters)
+			}
+			if got.CAExtensionError == nil || !strings.Contains(got.CAExtensionError.Error(), "duplicate") {
+				t.Fatalf("CAExtensionError = %v", got.CAExtensionError)
+			}
+		})
 	}
 }
 

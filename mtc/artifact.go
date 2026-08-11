@@ -60,6 +60,8 @@ type Proof struct {
 	Signatures     []MTCSignature
 }
 
+// Artifact is a parsed certificate view. Callers must treat its byte slices and
+// nested values as read-only.
 type Artifact struct {
 	InputKind              InputKind
 	Kind                   ArtifactKind

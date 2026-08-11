@@ -6,11 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
+	"unicode/utf8"
 )
 
 const (
 	classUniversal = 0
 	classContext   = 2
+	maxDERDepth    = 64
 )
 
 type derValue struct {
@@ -29,7 +32,7 @@ func parseExactDER(input []byte) (derValue, error) {
 	if len(rest) != 0 {
 		return derValue{}, errors.New("trailing data after DER value")
 	}
-	if err := validateDER(value); err != nil {
+	if err := validateDER(value, 0); err != nil {
 		return derValue{}, err
 	}
 	return value, nil
@@ -108,7 +111,10 @@ func parseDER(input []byte) (derValue, []byte, error) {
 	return value, input[end:], nil
 }
 
-func validateDER(value derValue) error {
+func validateDER(value derValue, depth int) error {
+	if depth > maxDERDepth {
+		return fmt.Errorf("DER nesting exceeds maximum depth %d", maxDERDepth)
+	}
 	if value.class == classUniversal {
 		if err := validateUniversalDER(value); err != nil {
 			return err
@@ -127,7 +133,7 @@ func validateDER(value derValue) error {
 		if value.class == classUniversal && value.tag == asn1.TagSet && previous != nil && bytes.Compare(previous, child.raw) > 0 {
 			return errors.New("DER SET elements are not in canonical order")
 		}
-		if err := validateDER(child); err != nil {
+		if err := validateDER(child, depth+1); err != nil {
 			return err
 		}
 		previous = child.raw
@@ -137,17 +143,26 @@ func validateDER(value derValue) error {
 }
 
 func validateUniversalDER(value derValue) error {
+	if value.tag == asn1.TagSequence || value.tag == asn1.TagSet {
+		if !value.constructed {
+			return errors.New("primitive DER SEQUENCE or SET")
+		}
+		return nil
+	}
+	if value.constructed {
+		return fmt.Errorf("constructed universal DER tag %d is not permitted", value.tag)
+	}
 	switch value.tag {
 	case asn1.TagBoolean:
-		if value.constructed || len(value.contents) != 1 || value.contents[0] != 0 && value.contents[0] != 0xff {
+		if len(value.contents) != 1 || value.contents[0] != 0 && value.contents[0] != 0xff {
 			return errors.New("invalid DER BOOLEAN")
 		}
 	case asn1.TagInteger:
-		if value.constructed || !isMinimalInteger(value.contents) {
+		if !isMinimalInteger(value.contents) {
 			return errors.New("invalid DER INTEGER")
 		}
 	case asn1.TagBitString:
-		if value.constructed || len(value.contents) == 0 || value.contents[0] > 7 {
+		if len(value.contents) == 0 || value.contents[0] > 7 {
 			return errors.New("invalid DER BIT STRING")
 		}
 		unused := value.contents[0]
@@ -157,28 +172,152 @@ func validateUniversalDER(value derValue) error {
 		if unused != 0 && value.contents[len(value.contents)-1]&byte((1<<unused)-1) != 0 {
 			return errors.New("non-zero unused DER BIT STRING bits")
 		}
+	case asn1.TagOctetString:
+		return nil
 	case asn1.TagNull:
-		if value.constructed || len(value.contents) != 0 {
+		if len(value.contents) != 0 {
 			return errors.New("invalid DER NULL")
 		}
 	case asn1.TagOID:
-		if value.constructed {
-			return errors.New("constructed DER OBJECT IDENTIFIER")
-		}
 		var oid asn1.ObjectIdentifier
 		if rest, err := asn1.Unmarshal(value.raw, &oid); err != nil || len(rest) != 0 {
 			return errors.New("invalid DER OBJECT IDENTIFIER")
 		}
+	case asn1.TagEnum:
+		if !isMinimalInteger(value.contents) {
+			return errors.New("invalid DER ENUMERATED")
+		}
+	case asn1.TagUTF8String:
+		if !utf8.Valid(value.contents) {
+			return errors.New("invalid DER UTF8String")
+		}
 	case 13: // RELATIVE-OID
-		if value.constructed || !isMinimalBase128(value.contents) {
+		if !isMinimalBase128(value.contents) {
 			return errors.New("invalid DER RELATIVE-OID")
 		}
-	case asn1.TagSequence, asn1.TagSet:
-		if !value.constructed {
-			return errors.New("primitive DER SEQUENCE or SET")
+	case asn1.TagNumericString:
+		if !allBytes(value.contents, isNumericStringByte) {
+			return errors.New("invalid DER NumericString")
 		}
+	case asn1.TagPrintableString:
+		if !allBytes(value.contents, isPrintableStringByte) {
+			return errors.New("invalid DER PrintableString")
+		}
+	case asn1.TagT61String:
+		// TeletexString uses an octet-oriented character repertoire.
+		return nil
+	case asn1.TagIA5String:
+		if !allBytes(value.contents, func(b byte) bool { return b <= 0x7f }) {
+			return errors.New("invalid DER IA5String")
+		}
+	case asn1.TagUTCTime:
+		if err := validateUTCTime(value); err != nil {
+			return err
+		}
+	case asn1.TagGeneralizedTime:
+		if err := validateGeneralizedTime(value); err != nil {
+			return err
+		}
+	case 26: // VisibleString
+		if !allBytes(value.contents, func(b byte) bool { return b >= 0x20 && b <= 0x7e }) {
+			return errors.New("invalid DER VisibleString")
+		}
+	case asn1.TagGeneralString:
+		// GeneralString uses an octet-oriented character repertoire.
+		return nil
+	case 28: // UniversalString
+		if !validUniversalString(value.contents) {
+			return errors.New("invalid DER UniversalString")
+		}
+	case asn1.TagBMPString:
+		if !validBMPString(value.contents) {
+			return errors.New("invalid DER BMPString")
+		}
+	default:
+		return fmt.Errorf("unsupported or reserved universal DER tag %d", value.tag)
 	}
 	return nil
+}
+
+func validateUTCTime(value derValue) error {
+	if len(value.contents) != 13 || value.contents[12] != 'Z' || !allBytes(value.contents[:12], isDigit) {
+		return errors.New("non-canonical DER UTCTime")
+	}
+	return validateTimeValue(value, "UTCTime")
+}
+
+func validateGeneralizedTime(value derValue) error {
+	contents := value.contents
+	if len(contents) < 15 || contents[len(contents)-1] != 'Z' || !allBytes(contents[:14], isDigit) {
+		return errors.New("non-canonical DER GeneralizedTime")
+	}
+	if len(contents) > 15 {
+		fraction := contents[15 : len(contents)-1]
+		if contents[14] != '.' || len(fraction) == 0 || !allBytes(fraction, isDigit) || fraction[len(fraction)-1] == '0' {
+			return errors.New("non-canonical DER GeneralizedTime fraction")
+		}
+	}
+	return validateTimeValue(value, "GeneralizedTime")
+}
+
+func validateTimeValue(value derValue, name string) error {
+	var parsed time.Time
+	if rest, err := asn1.Unmarshal(value.raw, &parsed); err != nil || len(rest) != 0 {
+		return fmt.Errorf("invalid DER %s", name)
+	}
+	return nil
+}
+
+func allBytes(input []byte, valid func(byte) bool) bool {
+	for _, b := range input {
+		if !valid(b) {
+			return false
+		}
+	}
+	return true
+}
+
+func isDigit(b byte) bool {
+	return b >= '0' && b <= '9'
+}
+
+func isNumericStringByte(b byte) bool {
+	return b == ' ' || isDigit(b)
+}
+
+func isPrintableStringByte(b byte) bool {
+	if b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || isDigit(b) {
+		return true
+	}
+	return bytes.ContainsRune([]byte(" '()+,-./:=?"), rune(b))
+}
+
+func validUniversalString(contents []byte) bool {
+	if len(contents)%4 != 0 {
+		return false
+	}
+	for len(contents) != 0 {
+		codePoint := uint32(contents[0])<<24 | uint32(contents[1])<<16 | uint32(contents[2])<<8 | uint32(contents[3])
+		if codePoint > utf8.MaxRune || codePoint >= 0xd800 && codePoint <= 0xdfff {
+			return false
+		}
+		contents = contents[4:]
+	}
+	return true
+}
+
+func validBMPString(contents []byte) bool {
+	if len(contents)%2 != 0 {
+		return false
+	}
+	for len(contents) != 0 {
+		codePoint := uint16(contents[0])<<8 | uint16(contents[1])
+		if codePoint >= 0xd800 && codePoint <= 0xdfff {
+			return false
+		}
+		contents = contents[2:]
+	}
+	return true
 }
 
 func isMinimalInteger(contents []byte) bool {
