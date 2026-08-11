@@ -7,7 +7,11 @@ import (
 	"math/big"
 )
 
-const maxTrustAnchorIDLength = 255
+const (
+	maxTrustAnchorIDLength        = 255
+	maxTrustAnchorIDArcTextLength = 3 * maxTrustAnchorIDLength
+	maxTrustAnchorIDTextLength    = 4*maxTrustAnchorIDLength - 1
+)
 
 func ParseCAIDName(input []byte) ([]byte, error) {
 	root, err := parseExactDER(append([]byte(nil), input...))
@@ -68,7 +72,18 @@ func encodeRelativeOID(text []byte) ([]byte, error) {
 	if len(text) == 0 {
 		return nil, errors.New("CA-ID attribute value is empty")
 	}
-	encoded := make([]byte, 0, len(text))
+	// An arc needs at most three decimal digits per base-128 byte, and the
+	// number of separators is less than the number of encoded bytes. Therefore
+	// no valid 255-byte identifier can exceed 4*255-1 text bytes, or contain an
+	// arc longer than 3*255 decimal digits.
+	if len(text) > maxTrustAnchorIDTextLength {
+		return nil, errors.New("CA-ID textual representation exceeds maximum length")
+	}
+	encodedCapacity := len(text)
+	if encodedCapacity > maxTrustAnchorIDLength {
+		encodedCapacity = maxTrustAnchorIDLength
+	}
+	encoded := make([]byte, 0, encodedCapacity)
 	for len(text) != 0 {
 		dot := len(text)
 		for i, b := range text {
@@ -80,6 +95,9 @@ func encodeRelativeOID(text []byte) ([]byte, error) {
 		arc := text[:dot]
 		if len(arc) == 0 {
 			return nil, errors.New("CA-ID attribute value contains an empty arc")
+		}
+		if len(arc) > maxTrustAnchorIDArcTextLength {
+			return nil, errors.New("CA-ID decimal arc exceeds maximum length")
 		}
 		if len(arc) > 1 && arc[0] == '0' {
 			return nil, errors.New("CA-ID attribute value contains a non-canonical arc")
