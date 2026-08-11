@@ -87,7 +87,7 @@ var draft05Rules = []Rule{
 		if params == nil {
 			return nil
 		}
-		if !positiveMTCSerial(params.MinSerial) || !positiveMTCSerial(params.MaxSerial) || params.MinSerial.Cmp(params.MaxSerial) > 0 {
+		if !validMTCSerialBound(params.MinSerial) || !validMTCSerialBound(params.MaxSerial) || params.MinSerial.Cmp(params.MaxSerial) > 0 {
 			return errorFinding("tbsCertificate.extensions.mtcCertificationAuthority", "MTC CA serial range is invalid")
 		}
 		return nil
@@ -292,6 +292,17 @@ func LintDraft05(artifact *Artifact) []Finding {
 	return runRules(artifact, draft05Rules)
 }
 
+// LintDraft05ForKind evaluates draft-05 rules in an explicit CA or subscriber
+// profile context without changing the parsed artifact's autodetected kind.
+func LintDraft05ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
+	if artifact == nil || expected != ArtifactCA && expected != ArtifactSubscriber {
+		return nil
+	}
+	local := *artifact
+	local.Kind = expected
+	return runRules(&local, draft05Rules)
+}
+
 func draftRule(code, section string, kinds []ArtifactKind, inputKinds []InputKind, evaluate func(*Artifact) *Finding) Rule {
 	return Rule{Code: code, Source: draft05Source, Section: section, Kinds: kinds, InputKinds: inputKinds, Evaluate: evaluate}
 }
@@ -322,8 +333,8 @@ func algorithmIdentifiersEqual(left, right AlgorithmIdentifier) bool {
 	return !left.ParametersPresent || bytes.Equal(left.Parameters.FullBytes, right.Parameters.FullBytes)
 }
 
-func positiveMTCSerial(serial *big.Int) bool {
-	return serial != nil && serial.Sign() > 0 && serial.Cmp(maxMTCSerial) <= 0
+func validMTCSerialBound(serial *big.Int) bool {
+	return serial != nil && serial.Sign() >= 0 && serial.Cmp(maxMTCSerial) <= 0
 }
 
 func matchingExtensions(artifact *Artifact, oid asn1.ObjectIdentifier) []Extension {

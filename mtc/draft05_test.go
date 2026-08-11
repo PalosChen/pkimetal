@@ -1,7 +1,10 @@
 package mtc_test
 
 import (
+	"bytes"
+	"encoding/asn1"
 	"math/big"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -34,45 +37,43 @@ func TestDraft05ValidArtifactsHaveNoFindings(t *testing.T) {
 func TestDraft05CARules(t *testing.T) {
 	tooLarge := new(big.Int).Lsh(big.NewInt(1), 64)
 	tests := []struct {
-		name      string
-		mutate    func(*mtctest.Template)
-		forceKind bool
-		code      string
-		severity  mtc.Severity
+		name     string
+		mutate   func(*mtctest.Template)
+		code     string
+		severity mtc.Severity
 	}{
-		{"subject is not CA ID", func(x *mtctest.Template) { x.Subject = mtctest.ValidSubscriberTemplate().Subject }, false, "e_mtc_ca_subject_not_ca_id", mtc.Error},
-		{"MTC CA extension missing", func(x *mtctest.Template) { mtctest.RemoveExtension(x, mtctest.OIDMTC_CA) }, true, "e_mtc_ca_extension_missing", mtc.Error},
+		{"subject is not CA ID", func(x *mtctest.Template) { x.Subject = mtctest.ValidSubscriberTemplate().Subject }, "e_mtc_ca_subject_not_ca_id", mtc.Error},
 		{"MTC CA extension not critical", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDMTC_CA, Value: mtctest.ValidCAExtensionDER()})
-		}, false, "e_mtc_ca_extension_not_critical", mtc.Error},
+		}, "e_mtc_ca_extension_not_critical", mtc.Error},
 		{"MTC CA extension malformed", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDMTC_CA, Critical: true, Value: []byte{0x30, 0x80, 0, 0}})
-		}, false, "f_mtc_ca_extension_malformed", mtc.Fatal},
+		}, "f_mtc_ca_extension_malformed", mtc.Fatal},
 		{"MTC CA extension duplicated", func(x *mtctest.Template) {
 			x.Extensions = append(x.Extensions, mtctest.Extension{ID: mtctest.OIDMTC_CA, Critical: true, Value: mtctest.ValidCAExtensionDER()})
-		}, false, "f_mtc_ca_extension_malformed", mtc.Fatal},
-		{"minimum serial zero", replaceCARange(big.NewInt(0), big.NewInt(10)), false, "e_mtc_ca_serial_range_invalid", mtc.Error},
-		{"minimum serial negative", replaceCARange(big.NewInt(-1), big.NewInt(10)), false, "e_mtc_ca_serial_range_invalid", mtc.Error},
-		{"maximum serial too large", replaceCARange(big.NewInt(1), tooLarge), false, "e_mtc_ca_serial_range_invalid", mtc.Error},
-		{"serial range reversed", replaceCARange(big.NewInt(10), big.NewInt(9)), false, "e_mtc_ca_serial_range_invalid", mtc.Error},
-		{"key usage missing", func(x *mtctest.Template) { mtctest.RemoveExtension(x, mtctest.OIDKeyUsage) }, false, "e_mtc_ca_key_usage_missing", mtc.Error},
+		}, "f_mtc_ca_extension_malformed", mtc.Fatal},
+		{"minimum serial negative", replaceCARange(big.NewInt(-1), big.NewInt(10)), "e_mtc_ca_serial_range_invalid", mtc.Error},
+		{"maximum serial negative", replaceCARange(big.NewInt(0), big.NewInt(-1)), "e_mtc_ca_serial_range_invalid", mtc.Error},
+		{"maximum serial too large", replaceCARange(big.NewInt(1), tooLarge), "e_mtc_ca_serial_range_invalid", mtc.Error},
+		{"serial range reversed", replaceCARange(big.NewInt(10), big.NewInt(9)), "e_mtc_ca_serial_range_invalid", mtc.Error},
+		{"key usage missing", func(x *mtctest.Template) { mtctest.RemoveExtension(x, mtctest.OIDKeyUsage) }, "e_mtc_ca_key_usage_missing", mtc.Error},
 		{"key cert sign missing", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(false)})
-		}, false, "e_mtc_ca_key_cert_sign_missing", mtc.Error},
+		}, "e_mtc_ca_key_cert_sign_missing", mtc.Error},
 		{"key usage malformed", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: []byte{0x03, 0x01, 0x08}})
-		}, false, "e_mtc_ca_key_cert_sign_missing", mtc.Error},
-		{"basic constraints missing", func(x *mtctest.Template) { mtctest.RemoveExtension(x, mtctest.OIDBasicConstraints) }, false, "e_mtc_ca_basic_constraints_missing", mtc.Error},
+		}, "e_mtc_ca_key_cert_sign_missing", mtc.Error},
+		{"basic constraints missing", func(x *mtctest.Template) { mtctest.RemoveExtension(x, mtctest.OIDBasicConstraints) }, "e_mtc_ca_basic_constraints_missing", mtc.Error},
 		{"basic constraints not CA", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDBasicConstraints, Critical: true, Value: mtctest.BasicConstraintsDER(false)})
-		}, false, "e_mtc_ca_basic_constraints_not_ca", mtc.Error},
+		}, "e_mtc_ca_basic_constraints_not_ca", mtc.Error},
 		{"basic constraints malformed", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDBasicConstraints, Critical: true, Value: []byte{0x30, 0x01, 0x01}})
-		}, false, "e_mtc_ca_basic_constraints_not_ca", mtc.Error},
+		}, "e_mtc_ca_basic_constraints_not_ca", mtc.Error},
 		{"SKI is not CA ID", func(x *mtctest.Template) {
 			x.Extensions = append(x.Extensions, mtctest.Extension{ID: mtctest.OIDSubjectKeyID, Value: mtctest.SubjectKeyIdentifierDER([]byte("wrong"))})
-		}, false, "w_mtc_ca_ski_not_ca_id", mtc.Warning},
-		{"structurally self-issued", func(x *mtctest.Template) { x.Issuer = append([]byte(nil), x.Subject...) }, false, "w_mtc_ca_self_issued", mtc.Warning},
+		}, "w_mtc_ca_ski_not_ca_id", mtc.Warning},
+		{"structurally self-issued", func(x *mtctest.Template) { x.Issuer = append([]byte(nil), x.Subject...) }, "w_mtc_ca_self_issued", mtc.Warning},
 	}
 
 	for _, tc := range tests {
@@ -80,21 +81,66 @@ func TestDraft05CARules(t *testing.T) {
 			tpl := mtctest.ValidCATemplate()
 			tc.mutate(&tpl)
 			artifact := parseArtifact(t, mtctest.Certificate(tpl), mtc.InputCertificate)
-			if tc.forceKind {
-				artifact.Kind = mtc.ArtifactCA
-			}
 			assertDraftFinding(t, mtc.LintDraft05(artifact), tc.code, tc.severity)
 		})
 	}
 }
 
+func TestLintDraft05ForKindEvaluatesExplicitCAWithoutMutation(t *testing.T) {
+	tpl := mtctest.ValidCATemplate()
+	mtctest.RemoveExtension(&tpl, mtctest.OIDMTC_CA)
+	artifact := parseArtifact(t, mtctest.Certificate(tpl), mtc.InputCertificate)
+	if artifact.Kind != mtc.ArtifactUnknown {
+		t.Fatalf("autodetected kind = %v, want unknown", artifact.Kind)
+	}
+	assertNoCode(t, mtc.LintDraft05(artifact), "e_mtc_ca_extension_missing")
+
+	originalKind := artifact.Kind
+	originalRaw := append([]byte(nil), artifact.Raw...)
+	originalTBS := append([]byte(nil), artifact.RawTBS...)
+	originalSubject := append([]byte(nil), artifact.SubjectRaw...)
+	originalSerial := new(big.Int).Set(artifact.SerialNumber)
+	originalExtensions := cloneExtensions(artifact.Extensions)
+
+	findings := mtc.LintDraft05ForKind(artifact, mtc.ArtifactCA)
+	assertDraftFinding(t, findings, "e_mtc_ca_extension_missing", mtc.Error)
+	if artifact.Kind != originalKind || !bytes.Equal(artifact.Raw, originalRaw) ||
+		!bytes.Equal(artifact.RawTBS, originalTBS) || !bytes.Equal(artifact.SubjectRaw, originalSubject) ||
+		artifact.SerialNumber.Cmp(originalSerial) != 0 || !reflect.DeepEqual(artifact.Extensions, originalExtensions) {
+		t.Fatalf("LintDraft05ForKind mutated caller artifact: %#v", artifact)
+	}
+}
+
+func TestLintDraft05ForKindHandlesNilAndUnsupportedKind(t *testing.T) {
+	if got := mtc.LintDraft05ForKind(nil, mtc.ArtifactCA); got != nil {
+		t.Fatalf("nil artifact findings = %#v", got)
+	}
+	artifact := parseArtifact(t, mtctest.Certificate(mtctest.ValidSubscriberTemplate()), mtc.InputCertificate)
+	if got := mtc.LintDraft05ForKind(artifact, mtc.ArtifactUnknown); got != nil {
+		t.Fatalf("unsupported expected kind findings = %#v", got)
+	}
+	if artifact.Kind != mtc.ArtifactSubscriber {
+		t.Fatalf("unsupported expected kind mutated artifact kind to %v", artifact.Kind)
+	}
+}
+
 func TestDraft05CASerialRangeBoundaries(t *testing.T) {
 	max := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 64), big.NewInt(1))
-	for _, bounds := range [][2]*big.Int{{big.NewInt(1), big.NewInt(1)}, {big.NewInt(1), max}, {max, max}} {
-		tpl := mtctest.ValidCATemplate()
-		replaceCARange(bounds[0], bounds[1])(&tpl)
-		artifact := parseArtifact(t, mtctest.Certificate(tpl), mtc.InputCertificate)
-		assertNoCode(t, mtc.LintDraft05(artifact), "e_mtc_ca_serial_range_invalid")
+	for _, tc := range []struct {
+		name     string
+		min, max *big.Int
+	}{
+		{"zero range", big.NewInt(0), big.NewInt(0)},
+		{"zero through maximum", big.NewInt(0), max},
+		{"positive singleton", big.NewInt(1), big.NewInt(1)},
+		{"maximum singleton", max, max},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := mtctest.ValidCATemplate()
+			replaceCARange(tc.min, tc.max)(&tpl)
+			artifact := parseArtifact(t, mtctest.Certificate(tpl), mtc.InputCertificate)
+			assertNoCode(t, mtc.LintDraft05(artifact), "e_mtc_ca_serial_range_invalid")
+		})
 	}
 }
 
@@ -325,4 +371,15 @@ func assertNoCode(t *testing.T, findings []mtc.Finding, code string) {
 			t.Fatalf("unexpected %s in %#v", code, findings)
 		}
 	}
+}
+
+func cloneExtensions(extensions []mtc.Extension) []mtc.Extension {
+	cloned := make([]mtc.Extension, len(extensions))
+	for i, extension := range extensions {
+		cloned[i] = extension
+		cloned[i].Raw = append([]byte(nil), extension.Raw...)
+		cloned[i].ID = append(asn1.ObjectIdentifier(nil), extension.ID...)
+		cloned[i].Value = append([]byte(nil), extension.Value...)
+	}
+	return cloned
 }
