@@ -309,13 +309,13 @@ func TBSCertificate(tpl Template) []byte {
 }
 
 func ValidCAIDNameDER() []byte {
-	relativeOID := der(0x0d, ValidCAID())
-	atv := der(0x30, mustMarshal(OIDCAID), relativeOID)
+	trustAnchorID := der(0x0c, []byte("32473.1"))
+	atv := der(0x30, mustMarshal(OIDCAID), trustAnchorID)
 	return der(0x30, der(0x31, atv))
 }
 
 func ValidCAID() []byte {
-	return []byte{0x88, 0x22, 0x38, 0x03}
+	return []byte{0x81, 0xfd, 0x59, 0x01}
 }
 
 func ValidCAExtensionDER() []byte {

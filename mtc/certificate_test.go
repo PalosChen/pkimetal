@@ -274,8 +274,8 @@ func TestParseCertificationAuthorityExtension(t *testing.T) {
 }
 
 func TestParseCAIDNameRequiresExactShape(t *testing.T) {
-	want := []byte{0x88, 0x22, 0x38, 0x03}
-	got, err := mtc.ParseCAIDName(mtctest.ValidCAIDNameDER())
+	want := []byte{0x81, 0xfd, 0x59, 0x01}
+	got, err := mtc.ParseCAIDName(nameWithCAIDValue(utf8StringDER("32473.1")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,18 +283,29 @@ func TestParseCAIDNameRequiresExactShape(t *testing.T) {
 		t.Fatalf("CA ID = %x, want %x", got, want)
 	}
 
-	wrongValue, err := asn1.Marshal("1.2.3")
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name  string
+		input []byte
+	}{
+		{"empty name", []byte{0x30, 0x00}},
+		{"trailing DER", append(nameWithCAIDValue(utf8StringDER("32473.1")), 0)},
+		{"RELATIVE-OID value", nameWithCAIDValue([]byte{0x0d, 0x04, 0x81, 0xfd, 0x59, 0x01})},
+		{"empty text", nameWithCAIDValue(utf8StringDER(""))},
+		{"leading dot", nameWithCAIDValue(utf8StringDER(".1"))},
+		{"trailing dot", nameWithCAIDValue(utf8StringDER("1."))},
+		{"empty arc", nameWithCAIDValue(utf8StringDER("1..2"))},
+		{"leading zero", nameWithCAIDValue(utf8StringDER("01.2"))},
+		{"non-ASCII digit", nameWithCAIDValue(utf8StringDER("1.\uff11"))},
+		{"sign", nameWithCAIDValue(utf8StringDER("1.+2"))},
+		{"whitespace", nameWithCAIDValue(utf8StringDER("1. 2"))},
+		{"uint64 overflow", nameWithCAIDValue(utf8StringDER("18446744073709551616.1"))},
 	}
-	for _, input := range [][]byte{
-		{0x30, 0x00},
-		append(append([]byte(nil), mtctest.ValidCAIDNameDER()...), 0),
-		nameWithCAIDValue(wrongValue),
-	} {
-		if _, err := mtc.ParseCAIDName(input); err == nil {
-			t.Fatalf("accepted malformed CA-ID Name %x", input)
-		}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := mtc.ParseCAIDName(tc.input); err == nil {
+				t.Fatalf("accepted malformed CA-ID Name %x", tc.input)
+			}
+		})
 	}
 }
 
@@ -311,7 +322,7 @@ func TestParseClassificationAndUniqueIDs(t *testing.T) {
 	if !got.IssuerUniqueIDPresent || !got.SubjectUniqueIDPresent {
 		t.Fatal("unique ID presence was not retained")
 	}
-	if !bytes.Equal(got.IssuerCAID, []byte{0x88, 0x22, 0x38, 0x03}) {
+	if !bytes.Equal(got.IssuerCAID, mtctest.ValidCAID()) {
 		t.Fatalf("issuer CA ID = %x", got.IssuerCAID)
 	}
 }
@@ -374,6 +385,33 @@ func TestCheckedInFixtures(t *testing.T) {
 	}
 }
 
+func TestIndependentDraft05FixturesHaveRecognizedIssuerCAID(t *testing.T) {
+	for _, name := range []string{"draft05-standalone.pem", "draft05-landmark.pem"} {
+		t.Run(name, func(t *testing.T) {
+			contents, err := os.ReadFile(filepath.Join("testdata", name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			block, rest := pem.Decode(contents)
+			if block == nil || len(bytes.TrimSpace(rest)) != 0 {
+				t.Fatal("invalid PEM fixture")
+			}
+			artifact, err := mtc.Parse(block.Bytes, mtc.InputCertificate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(artifact.IssuerCAID, []byte{0x82, 0xdb, 0x4e, 0x05, 0x01}) {
+				t.Fatalf("issuer CA ID = %x, want 82db4e0501", artifact.IssuerCAID)
+			}
+			for _, finding := range mtc.LintDraft05(artifact) {
+				if finding.Code == "e_mtc_subscriber_issuer_not_ca_id" {
+					t.Fatalf("valid fixture produced issuer CA-ID finding: %+v", finding)
+				}
+			}
+		})
+	}
+}
+
 func TestGeneratedFixturesAreReproducible(t *testing.T) {
 	dir := t.TempDir()
 	if err := mtctest.WriteGeneratedFixtures(dir); err != nil {
@@ -422,4 +460,11 @@ func nameWithCAIDValue(value []byte) []byte {
 	atv := append(append([]byte{0x30, byte(len(oid) + len(value))}, oid...), value...)
 	set := append([]byte{0x31, byte(len(atv))}, atv...)
 	return append([]byte{0x30, byte(len(set))}, set...)
+}
+
+func utf8StringDER(value string) []byte {
+	if len(value) >= 128 {
+		panic("utf8StringDER only supports short values")
+	}
+	return append([]byte{0x0c, byte(len(value))}, value...)
 }

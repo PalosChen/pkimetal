@@ -120,7 +120,7 @@ func TestCertificationAuthorityExtensionRejectsMalformedFields(t *testing.T) {
 
 func TestCAIDNameRejectsMalformedComponents(t *testing.T) {
 	oid := mustASN1Marshal(t, OIDCAID)
-	caID := testDER(0x0d, []byte{0x2a})
+	caID := testDER(0x0c, []byte("42"))
 	atv := testDER(0x30, oid, caID)
 	rdn := testDER(0x31, atv)
 	tests := []struct {
@@ -137,6 +137,7 @@ func TestCAIDNameRejectsMalformedComponents(t *testing.T) {
 		{"attribute OID wrong type", testDER(0x30, testDER(0x31, testDER(0x30, []byte{0x05, 0x00})))},
 		{"missing CA ID value", testDER(0x30, testDER(0x31, testDER(0x30, oid)))},
 		{"CA ID value wrong type", testDER(0x30, testDER(0x31, testDER(0x30, oid, []byte{0x05, 0x00})))},
+		{"CA ID value RELATIVE-OID", testDER(0x30, testDER(0x31, testDER(0x30, oid, testDER(0x0d, []byte{0x2a}))))},
 		{"trailing attribute field", testDER(0x30, testDER(0x31, testDER(0x30, oid, caID, []byte{0x05, 0x00})))},
 	}
 	for _, tc := range tests {

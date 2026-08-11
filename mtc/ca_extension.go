@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 )
 
 func ParseCAIDName(input []byte) ([]byte, error) {
@@ -53,13 +54,65 @@ func ParseCAIDName(input []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := expectDER(caID, classUniversal, 13, false, "CA-ID attribute value"); err != nil {
+	if err := expectDER(caID, classUniversal, asn1.TagUTF8String, false, "CA-ID attribute value"); err != nil {
 		return nil, err
 	}
 	if err := noRemainingDER(attribute, "CA-ID attribute"); err != nil {
 		return nil, err
 	}
-	return append([]byte(nil), caID.contents...), nil
+	return encodeRelativeOID(caID.contents)
+}
+
+func encodeRelativeOID(text []byte) ([]byte, error) {
+	if len(text) == 0 {
+		return nil, errors.New("CA-ID attribute value is empty")
+	}
+	encoded := make([]byte, 0, len(text))
+	for len(text) != 0 {
+		dot := len(text)
+		for i, b := range text {
+			if b == '.' {
+				dot = i
+				break
+			}
+		}
+		arc := text[:dot]
+		if len(arc) == 0 {
+			return nil, errors.New("CA-ID attribute value contains an empty arc")
+		}
+		if len(arc) > 1 && arc[0] == '0' {
+			return nil, errors.New("CA-ID attribute value contains a non-canonical arc")
+		}
+		for _, b := range arc {
+			if b < '0' || b > '9' {
+				return nil, errors.New("CA-ID attribute value is not an ASCII dotted-decimal identifier")
+			}
+		}
+		value, err := strconv.ParseUint(string(arc), 10, 64)
+		if err != nil {
+			return nil, errors.New("CA-ID attribute value arc overflows uint64")
+		}
+		encoded = appendBase128(encoded, value)
+		if dot == len(text) {
+			break
+		}
+		text = text[dot+1:]
+		if len(text) == 0 {
+			return nil, errors.New("CA-ID attribute value contains an empty arc")
+		}
+	}
+	return encoded, nil
+}
+
+func appendBase128(output []byte, value uint64) []byte {
+	var encoded [10]byte
+	i := len(encoded) - 1
+	encoded[i] = byte(value & 0x7f)
+	for value >>= 7; value != 0; value >>= 7 {
+		i--
+		encoded[i] = byte(value&0x7f) | 0x80
+	}
+	return append(output, encoded[i:]...)
 }
 
 func ParseCertificationAuthorityExtension(input []byte) (*CertificationAuthority, error) {
