@@ -186,6 +186,9 @@ func POST(fhctx *fasthttp.RequestCtx, path string) int {
 		case config.RESPONSEFORMAT_TEXT:
 			status = sendTEXTResponse(fhctx, lrespFiltered)
 		}
+		if errorMessage != "" {
+			status = fasthttp.StatusBadRequest
+		}
 		fhctx.SetStatusCode(status)
 		doneChan <- 0
 	}()
