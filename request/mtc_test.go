@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	stdx509 "crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
@@ -54,7 +55,7 @@ func TestMTCProfileMetadataAndClassification(t *testing.T) {
 	}
 }
 
-func TestParseCertificateBytesRecognizedMTCBypassesLegacyParser(t *testing.T) {
+func TestParseCertificateBytesRecognizedMTCRetainsLegacyCertificateWhenAvailable(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		decoded   []byte
@@ -67,15 +68,22 @@ func TestParseCertificateBytesRecognizedMTCBypassesLegacyParser(t *testing.T) {
 		{"TBS subscriber", mtctest.TBSCertificate(mtctest.ValidSubscriberTemplate()), mtc.InputTBSCertificate, mtc.ArtifactSubscriber},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			wantCert := &x509.Certificate{}
 			calls := 0
-			processed, cert, artifact, err := parseCertificateBytes(tc.decoded, tc.inputKind, func([]byte) (*x509.Certificate, error) {
+			processed, cert, artifact, err := parseCertificateBytes(tc.decoded, tc.inputKind, func(input []byte) (*x509.Certificate, error) {
 				calls++
-				panic("legacy parser must not be called")
+				if tc.inputKind == mtc.InputCertificate && !bytes.Equal(input, tc.decoded) {
+					t.Fatal("legacy parser received modified complete certificate")
+				}
+				if tc.inputKind == mtc.InputTBSCertificate && bytes.Equal(input, tc.decoded) {
+					t.Fatal("legacy parser received an unwrapped TBS certificate")
+				}
+				return wantCert, nil
 			})
 			if err != nil {
 				t.Fatalf("parseCertificateBytes() error = %v", err)
 			}
-			if calls != 0 || cert != nil {
+			if calls != 1 || cert != wantCert {
 				t.Fatalf("legacy calls/certificate = %d/%#v", calls, cert)
 			}
 			if artifact == nil || artifact.Kind != tc.wantKind {
@@ -84,7 +92,67 @@ func TestParseCertificateBytesRecognizedMTCBypassesLegacyParser(t *testing.T) {
 			if !bytes.Equal(processed, tc.decoded) {
 				t.Fatal("recognized MTC bytes were modified")
 			}
+			processed[0] ^= 0xff
+			if artifact.Raw[0] == processed[0] {
+				t.Fatal("artifact raw bytes alias the returned request bytes")
+			}
 		})
+	}
+}
+
+func TestParseCertificateBytesRecognizedMTCIgnoresLegacyFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		decoded   []byte
+		inputKind mtc.InputKind
+		panic     bool
+	}{
+		{"certificate error", mtctest.Certificate(mtctest.ValidCATemplate()), mtc.InputCertificate, false},
+		{"certificate panic", mtctest.Certificate(mtctest.ValidSubscriberTemplate()), mtc.InputCertificate, true},
+		{"TBS error", mtctest.TBSCertificate(mtctest.ValidCATemplate()), mtc.InputTBSCertificate, false},
+		{"TBS panic", mtctest.TBSCertificate(mtctest.ValidSubscriberTemplate()), mtc.InputTBSCertificate, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			processed, cert, artifact, err := parseCertificateBytes(tc.decoded, tc.inputKind, func(input []byte) (*x509.Certificate, error) {
+				calls++
+				if tc.inputKind == mtc.InputTBSCertificate && bytes.Equal(input, tc.decoded) {
+					t.Fatal("legacy parser received an unwrapped TBS certificate")
+				}
+				if tc.panic {
+					panic("unsupported MTC algorithm")
+				}
+				return &x509.Certificate{}, errors.New("unsupported MTC algorithm")
+			})
+			if err != nil {
+				t.Fatalf("parseCertificateBytes() error = %v", err)
+			}
+			if calls != 1 || cert != nil {
+				t.Fatalf("legacy calls/certificate = %d/%#v", calls, cert)
+			}
+			if artifact == nil || (artifact.Kind != mtc.ArtifactCA && artifact.Kind != mtc.ArtifactSubscriber) {
+				t.Fatalf("artifact = %#v", artifact)
+			}
+			if !bytes.Equal(processed, tc.decoded) {
+				t.Fatal("recognized MTC bytes were modified after legacy failure")
+			}
+		})
+	}
+}
+
+func TestParseCertificateBytesRecognizedMTCLegacyParserCannotMutateRequestBytes(t *testing.T) {
+	decoded := mtctest.Certificate(mtctest.ValidCATemplate())
+	want := append([]byte(nil), decoded...)
+
+	processed, _, artifact, err := parseCertificateBytes(decoded, mtc.InputCertificate, func(input []byte) (*x509.Certificate, error) {
+		input[0] ^= 0xff
+		return &x509.Certificate{}, nil
+	})
+	if err != nil {
+		t.Fatalf("parseCertificateBytes() error = %v", err)
+	}
+	if !bytes.Equal(decoded, want) || !bytes.Equal(processed, want) || artifact == nil || !bytes.Equal(artifact.Raw, want) {
+		t.Fatal("best-effort legacy parser mutated recognized MTC bytes")
 	}
 }
 
@@ -93,13 +161,15 @@ func TestParseCertificateBytesRetainsMalformedSubscriberProof(t *testing.T) {
 	tpl.Signature = mtctest.MalformedProofBytes()
 	decoded := mtctest.Certificate(tpl)
 
+	calls := 0
 	processed, cert, artifact, err := parseCertificateBytes(decoded, mtc.InputCertificate, func([]byte) (*x509.Certificate, error) {
+		calls++
 		return nil, errors.New("unsupported ML-DSA")
 	})
 	if err != nil {
 		t.Fatalf("parseCertificateBytes() error = %v", err)
 	}
-	if cert != nil || artifact == nil || artifact.Kind != mtc.ArtifactSubscriber || artifact.ProofParseError == nil {
+	if calls != 1 || cert != nil || artifact == nil || artifact.Kind != mtc.ArtifactSubscriber || artifact.ProofParseError == nil {
 		t.Fatalf("certificate/artifact = %#v/%#v", cert, artifact)
 	}
 	if !bytes.Equal(processed, decoded) {
@@ -198,9 +268,6 @@ func TestMTCRequestParsingAndProfileSelection(t *testing.T) {
 				t.Fatalf("parseCertificateInput() error = %v", err)
 			}
 			ri.cert = cert
-			if cert != nil {
-				t.Fatalf("legacy certificate unexpectedly present: %#v", cert)
-			}
 			if ri.mtcArtifact == nil || ri.mtcArtifact.Kind != tc.wantKind {
 				t.Fatalf("MTC artifact = %#v, want kind %v", ri.mtcArtifact, tc.wantKind)
 			}
@@ -265,6 +332,50 @@ func TestMalformedMTCProofPOSTSucceedsAndDispatchesArtifact(t *testing.T) {
 	tpl := mtctest.ValidSubscriberTemplate()
 	tpl.Signature = mtctest.MalformedProofBytes()
 	decoded := mtctest.Certificate(tpl)
+	request := postAndCaptureMTCRequest(t, decoded, "mtc_ca")
+
+	if request.ProfileId != linter.MTC_CA {
+		t.Fatalf("explicit mismatch profile = %v, want %v", request.ProfileId, linter.MTC_CA)
+	}
+	if request.MTCArtifact == nil || request.MTCArtifact.Kind != mtc.ArtifactSubscriber || request.MTCArtifact.ProofParseError == nil {
+		t.Fatalf("dispatched certificate/artifact = %#v/%#v", request.Cert, request.MTCArtifact)
+	}
+	if !bytes.Equal(request.DecodedInput, decoded) {
+		t.Fatal("POST dispatch modified malformed-proof MTC bytes")
+	}
+}
+
+func TestMTCPOSTDispatchesAvailableLegacyCertificate(t *testing.T) {
+	decoded := legacyCompatibleMTCCA(t)
+	request := postAndCaptureMTCRequest(t, decoded, "mtc_ca")
+
+	if request.Cert == nil || request.MTCArtifact == nil || request.MTCArtifact.Kind != mtc.ArtifactCA {
+		t.Fatalf("dispatched certificate/artifact = %#v/%#v", request.Cert, request.MTCArtifact)
+	}
+	if !bytes.Equal(request.DecodedInput, decoded) || !bytes.Equal(request.Cert.Raw, decoded) {
+		t.Fatal("POST dispatch did not retain the original complete certificate bytes")
+	}
+}
+
+func legacyCompatibleMTCCA(t *testing.T) []byte {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sha256WithRSA := asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11}
+	nullParameters := []byte{0x05, 0x00}
+	tpl := mtctest.ValidCATemplate()
+	tpl.TBSSignature = mtctest.Algorithm{OID: sha256WithRSA, ParametersPresent: true, Parameters: nullParameters}
+	tpl.OuterSignature = tpl.TBSSignature
+	tpl.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDRSAEncryption, ParametersPresent: true, Parameters: nullParameters}
+	tpl.SubjectPublicKey = stdx509.MarshalPKCS1PublicKey(&key.PublicKey)
+	tpl.Signature = []byte{0x01}
+	return mtctest.Certificate(tpl)
+}
+
+func postAndCaptureMTCRequest(t *testing.T, decoded []byte, profile string) linter.LintingRequest {
+	t.Helper()
 
 	originalLinters := linter.Linters
 	t.Cleanup(func() { linter.Linters = originalLinters })
@@ -286,7 +397,7 @@ func TestMalformedMTCProofPOSTSucceedsAndDispatchesArtifact(t *testing.T) {
 
 	form := url.Values{
 		"b64cert": {base64.StdEncoding.EncodeToString(decoded)},
-		"profile": {"mtc_ca"},
+		"profile": {profile},
 		"format":  {"json"},
 	}
 	listener := fasthttputil.NewInmemoryListener()
@@ -312,15 +423,5 @@ func TestMalformedMTCProofPOSTSucceedsAndDispatchesArtifact(t *testing.T) {
 	if resp.StatusCode() != fasthttp.StatusOK {
 		t.Fatalf("POST status = %d, body = %s", resp.StatusCode(), resp.Body())
 	}
-
-	request := <-dispatched
-	if request.ProfileId != linter.MTC_CA {
-		t.Fatalf("explicit mismatch profile = %v, want %v", request.ProfileId, linter.MTC_CA)
-	}
-	if request.Cert != nil || request.MTCArtifact == nil || request.MTCArtifact.Kind != mtc.ArtifactSubscriber || request.MTCArtifact.ProofParseError == nil {
-		t.Fatalf("dispatched certificate/artifact = %#v/%#v", request.Cert, request.MTCArtifact)
-	}
-	if !bytes.Equal(request.DecodedInput, decoded) {
-		t.Fatal("POST dispatch modified malformed-proof MTC bytes")
-	}
+	return <-dispatched
 }
