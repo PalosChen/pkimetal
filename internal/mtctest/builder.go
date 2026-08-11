@@ -34,6 +34,24 @@ type Extension struct {
 	Value    []byte
 }
 
+type ProofExtension struct {
+	Type uint16
+	Data []byte
+}
+
+type ProofSignature struct {
+	CosignerID []byte
+	Signature  []byte
+}
+
+type Proof struct {
+	Extensions     []ProofExtension
+	Start          uint64
+	End            uint64
+	InclusionProof []byte
+	Signatures     []ProofSignature
+}
+
 type Template struct {
 	Serial                 *big.Int
 	TBSSignature           Algorithm
@@ -68,12 +86,47 @@ func ValidSubscriberTemplate() Template {
 		Extensions: []Extension{
 			{ID: OIDBasicConstraints, Critical: true, Value: der(0x30, nil)},
 		},
-		Signature: []byte{0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0},
+		Signature: ProofBytes(ValidProof()),
 	}
 }
 
 func ValidCQRPSubscriberTemplate() Template {
 	return ValidSubscriberTemplate()
+}
+
+func ValidProof() Proof {
+	return Proof{Start: 0, End: 8}
+}
+
+func ProofBytes(proof Proof) []byte {
+	var extensions bytes.Buffer
+	for _, extension := range proof.Extensions {
+		writeUint16(&extensions, extension.Type)
+		writeVector16(&extensions, extension.Data)
+	}
+
+	var signatures bytes.Buffer
+	for _, signature := range proof.Signatures {
+		if len(signature.CosignerID) > 255 {
+			panic("cosigner ID exceeds uint8 length")
+		}
+		signatures.WriteByte(byte(len(signature.CosignerID)))
+		signatures.Write(signature.CosignerID)
+		writeVector16(&signatures, signature.Signature)
+	}
+
+	var encoded bytes.Buffer
+	writeVector16(&encoded, extensions.Bytes())
+	writeUint48(&encoded, proof.Start)
+	writeUint48(&encoded, proof.End)
+	writeVector16(&encoded, proof.InclusionProof)
+	writeVector16(&encoded, signatures.Bytes())
+	return encoded.Bytes()
+}
+
+func MalformedProofBytes() []byte {
+	valid := ProofBytes(ValidProof())
+	return clone(valid[:len(valid)-1])
 }
 
 func ValidCATemplate() Template {
@@ -233,4 +286,31 @@ func mustMarshal(value any) []byte {
 
 func clone(input []byte) []byte {
 	return append([]byte(nil), input...)
+}
+
+func writeVector16(output *bytes.Buffer, contents []byte) {
+	if len(contents) > 65535 {
+		panic("vector exceeds uint16 length")
+	}
+	writeUint16(output, uint16(len(contents)))
+	output.Write(contents)
+}
+
+func writeUint16(output *bytes.Buffer, value uint16) {
+	output.WriteByte(byte(value >> 8))
+	output.WriteByte(byte(value))
+}
+
+func writeUint48(output *bytes.Buffer, value uint64) {
+	if value > (1<<48)-1 {
+		panic("value exceeds uint48")
+	}
+	output.Write([]byte{
+		byte(value >> 40),
+		byte(value >> 32),
+		byte(value >> 24),
+		byte(value >> 16),
+		byte(value >> 8),
+		byte(value),
+	})
 }

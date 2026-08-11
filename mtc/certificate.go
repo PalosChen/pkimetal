@@ -53,6 +53,9 @@ func Parse(input []byte, kind InputKind) (*Artifact, error) {
 		return nil, err
 	}
 	classifyArtifact(artifact)
+	if artifact.InputKind == InputCertificate && artifact.Kind == ArtifactSubscriber {
+		artifact.Proof, artifact.ProofParseError = ParseProof(artifact.SignatureValue)
+	}
 	return artifact, nil
 }
 

@@ -35,8 +35,8 @@ func TestParseCertificateWithoutKnownPublicKeyAlgorithm(t *testing.T) {
 	if !bytes.Equal(got.SignatureValue, mtctest.ValidSubscriberTemplate().Signature) {
 		t.Fatal("signature bytes were not retained")
 	}
-	if got.Proof != nil {
-		t.Fatal("envelope parser decoded a proof")
+	if got.Proof == nil || got.ProofParseError != nil {
+		t.Fatalf("proof/error = %#v/%v", got.Proof, got.ProofParseError)
 	}
 }
 
@@ -52,8 +52,8 @@ func TestParseTBSCertificateHasNoOuterEnvelope(t *testing.T) {
 	if len(got.SignatureValue) != 0 || got.SignatureUnused != 0 {
 		t.Fatal("TBS input has an outer signature value")
 	}
-	if got.Proof != nil {
-		t.Fatal("TBS input has a proof")
+	if got.Proof != nil || got.ProofParseError != nil {
+		t.Fatalf("TBS proof/error = %#v/%v", got.Proof, got.ProofParseError)
 	}
 	if !bytes.Equal(got.Raw, der) || !bytes.Equal(got.RawTBS, der) {
 		t.Fatal("TBS raw bytes were not retained")
