@@ -3,6 +3,7 @@
 A REST API and web interface that integrates multiple linters to perform pre- and post-issuance linting of PKI artifacts (Certificates, Precertificates, CRLs, and OCSP Responses).
 
 > **Experimental MTC fork:** This fork adds native linting for
+> **Deployment scope: experimental fork only.**
 > [Merkle Tree Certificates draft-05](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05)
 > through `mtclint`, plus a separate CQRP v0.2.0 overlay through `cqrplint`.
 > Use the explicit `mtc_ca`, `mtc_subscriber`, `cqrp_mtc_ca`, or

@@ -319,19 +319,24 @@ func TestExperimentalDeploymentDocumentation(t *testing.T) {
 	}
 
 	readme := read("../README.md")
-	for _, required := range []string{
-		"public services at\n> `pkimet.al` and `dev.pkimet.al`",
-		"build and deploy this fork separately",
+	const deploymentMarker = "Deployment scope: experimental fork only"
+	if count := strings.Count(readme, deploymentMarker); count != 1 {
+		t.Errorf("README deployment marker occurrences = %d, want 1", count)
+	}
+	dockerSection := markdownSection(t, readme, "## Docker containers")
+	for _, url := range []string{
 		"https://github.com/orgs/pkimetal/packages?repo_name=pkimetal",
-		"upstream GHCR images",
-		"separately built image from this fork",
-		"https://pkimet.al/",
-		"https://dev.pkimet.al/",
-		"upstream public instances",
-		"must not be used as MTC or CQRP endpoints",
+		"https://github.com/pkimetal/pkimetal/pkgs/container/pkimetal",
+		"https://github.com/pkimetal/pkimetal/pkgs/container/pkimetal-dev",
 	} {
-		if !strings.Contains(readme, required) {
-			t.Errorf("README lacks deployment boundary %q", required)
+		if !strings.Contains(dockerSection, url) {
+			t.Errorf("README Docker section lacks upstream link %q", url)
+		}
+	}
+	publicSection := markdownSection(t, readme, "## Public instances")
+	for _, url := range []string{"https://pkimet.al/", "https://dev.pkimet.al/"} {
+		if !strings.Contains(publicSection, url) {
+			t.Errorf("README Public instances section lacks upstream link %q", url)
 		}
 	}
 
@@ -344,6 +349,19 @@ func TestExperimentalDeploymentDocumentation(t *testing.T) {
 	if !strings.Contains(openapi, "description: Experimental local fork deployment") {
 		t.Error("OpenAPI lacks an experimental local deployment server description")
 	}
+}
+
+func markdownSection(t *testing.T, document, heading string) string {
+	t.Helper()
+	start := strings.Index(document, heading)
+	if start < 0 {
+		t.Fatalf("document lacks heading %q", heading)
+	}
+	body := document[start+len(heading):]
+	if end := strings.Index(body, "\n## "); end >= 0 {
+		body = body[:end]
+	}
+	return body
 }
 
 type openAPISchema struct {
@@ -369,12 +387,17 @@ type openAPIRequestBody struct {
 	Content map[string]openAPIMediaType `yaml:"content"`
 }
 
-func TestOpenAPIMTCCertificateRequests(t *testing.T) {
+func TestOpenAPIEndpointInputAliases(t *testing.T) {
 	contents, err := os.ReadFile("../doc/openapi.yaml")
 	if err != nil {
 		t.Fatalf("read OpenAPI document: %v", err)
 	}
 	var spec struct {
+		Paths map[string]struct {
+			Post struct {
+				RequestBody openAPISchema `yaml:"requestBody"`
+			} `yaml:"post"`
+		} `yaml:"paths"`
 		Components struct {
 			RequestBodies map[string]openAPIRequestBody `yaml:"requestBodies"`
 			Schemas       map[string]openAPISchema      `yaml:"schemas"`
@@ -385,16 +408,25 @@ func TestOpenAPIMTCCertificateRequests(t *testing.T) {
 	}
 
 	tests := []struct {
+		path        string
 		requestBody string
 		schema      string
 		alias       string
 		binaryMedia string
 	}{
-		{"CertificateLintRequestBody", "CertificateLintRequest", "b64cert", "application/pkix-cert"},
-		{"TBSCertificateLintRequestBody", "TBSCertificateLintRequest", "b64tbscert", "application/octet-stream"},
+		{"/lintcert", "CertificateLintRequestBody", "CertificateLintRequest", "b64cert", "application/pkix-cert"},
+		{"/linttbscert", "TBSCertificateLintRequestBody", "TBSCertificateLintRequest", "b64tbscert", "application/octet-stream"},
+		{"/lintcrl", "CRLLintRequestBody", "CRLLintRequest", "b64crl", ""},
+		{"/linttbscrl", "TBSCRLLintRequestBody", "TBSCRLLintRequest", "b64tbscrl", ""},
+		{"/lintocsp", "OCSPLintRequestBody", "OCSPLintRequest", "b64ocsp", ""},
+		{"/linttbsocsp", "TBSOCSPLintRequestBody", "TBSOCSPLintRequest", "b64tbsocsp", ""},
 	}
+	allAliases := []string{"b64cert", "b64tbscert", "b64crl", "b64tbscrl", "b64ocsp", "b64tbsocsp"}
 	for _, tc := range tests {
 		t.Run(tc.schema, func(t *testing.T) {
+			if got, want := spec.Paths[tc.path].Post.RequestBody.Ref, "#/components/requestBodies/"+tc.requestBody; got != want {
+				t.Errorf("%s request body ref = %q, want %q", tc.path, got, want)
+			}
 			form := spec.Components.RequestBodies[tc.requestBody].Content["application/x-www-form-urlencoded"]
 			if got, want := form.Schema.Ref, "#/components/schemas/"+tc.schema; got != want {
 				t.Errorf("form schema ref = %q, want %q", got, want)
@@ -407,6 +439,13 @@ func TestOpenAPIMTCCertificateRequests(t *testing.T) {
 			for _, property := range []string{"b64input", tc.alias} {
 				if _, ok := input.Properties[property]; !ok {
 					t.Errorf("%s lacks property %q", tc.schema, property)
+				}
+			}
+			for _, alias := range allAliases {
+				if alias != tc.alias {
+					if _, ok := input.Properties[alias]; ok {
+						t.Errorf("%s documents wrong endpoint alias %q", tc.schema, alias)
+					}
 				}
 			}
 			if len(input.AnyOf) != 2 || len(input.OneOf) != 0 {
@@ -435,14 +474,23 @@ func TestOpenAPIMTCCertificateRequests(t *testing.T) {
 				if _, ok := value["b64input"]; ok {
 					t.Errorf("form example %q should demonstrate alias rather than b64input", name)
 				}
+				for _, alias := range allAliases {
+					if alias != tc.alias {
+						if _, ok := value[alias]; ok {
+							t.Errorf("form example %q uses wrong endpoint alias %q", name, alias)
+						}
+					}
+				}
 			}
-			binaryExamples := spec.Components.RequestBodies[tc.requestBody].Content[tc.binaryMedia].Examples
-			if len(binaryExamples) == 0 {
-				t.Errorf("%s binary media type has no descriptive example", tc.requestBody)
-			}
-			for name, example := range binaryExamples {
-				if example.Value != nil {
-					t.Errorf("binary example %q fabricates value %#v", name, example.Value)
+			if tc.binaryMedia != "" {
+				binaryExamples := spec.Components.RequestBodies[tc.requestBody].Content[tc.binaryMedia].Examples
+				if len(binaryExamples) == 0 {
+					t.Errorf("%s binary media type has no descriptive example", tc.requestBody)
+				}
+				for name, example := range binaryExamples {
+					if example.Value != nil {
+						t.Errorf("binary example %q fabricates value %#v", name, example.Value)
+					}
 				}
 			}
 		})

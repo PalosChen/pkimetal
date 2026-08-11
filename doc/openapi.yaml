@@ -71,7 +71,7 @@ paths:
       tags:
         - crl
       requestBody:
-        $ref: '#/components/requestBodies/LintRequestBody'
+        $ref: '#/components/requestBodies/CRLLintRequestBody'
       responses:
         '200':
           $ref: '#/components/responses/LintingSuccessful'
@@ -85,7 +85,7 @@ paths:
       tags:
         - crl
       requestBody:
-        $ref: '#/components/requestBodies/LintRequestBody'
+        $ref: '#/components/requestBodies/TBSCRLLintRequestBody'
       responses:
         '200':
           $ref: '#/components/responses/LintingSuccessful'
@@ -100,7 +100,7 @@ paths:
       tags:
         - ocsp
       requestBody:
-        $ref: '#/components/requestBodies/LintRequestBody'
+        $ref: '#/components/requestBodies/OCSPLintRequestBody'
       responses:
         '200':
           $ref: '#/components/responses/LintingSuccessful'
@@ -114,7 +114,7 @@ paths:
       tags:
         - ocsp
       requestBody:
-        $ref: '#/components/requestBodies/LintRequestBody'
+        $ref: '#/components/requestBodies/TBSOCSPLintRequestBody'
       responses:
         '200':
           $ref: '#/components/responses/LintingSuccessful'
@@ -189,14 +189,6 @@ components:
         $ref: '#/components/schemas/FindingSeverity'
 
   requestBodies:
-    LintRequestBody:
-      description: The parameters for the linting request
-      required: true
-      content:
-        application/x-www-form-urlencoded:
-          schema:
-            $ref: '#/components/schemas/LintRequest'
-
     CertificateLintRequestBody:
       description: >-
         A PEM/Base64 form value or a raw complete DER Certificate. For raw DER,
@@ -258,6 +250,62 @@ components:
             tbsCertificate:
               summary: Caller-provided DER TBSCertificate
               description: Binary body; no certificate bytes are fabricated here.
+
+    CRLLintRequestBody:
+      description: A PEM/Base64 CRL form value and common linting options.
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '#/components/schemas/CRLLintRequest'
+          examples:
+            crl:
+              summary: CRL using the endpoint-specific alias
+              value:
+                b64crl: BASE64_OR_PEM_CRL_FROM_THE_CALLER
+                format: json
+
+    TBSCRLLintRequestBody:
+      description: A PEM/Base64 TBSCertList form value and common linting options.
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '#/components/schemas/TBSCRLLintRequest'
+          examples:
+            tbsCRL:
+              summary: TBSCertList using the endpoint-specific alias
+              value:
+                b64tbscrl: BASE64_OR_PEM_TBS_CRL_FROM_THE_CALLER
+                format: json
+
+    OCSPLintRequestBody:
+      description: A PEM/Base64 OCSP response form value and common linting options.
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '#/components/schemas/OCSPLintRequest'
+          examples:
+            ocspResponse:
+              summary: OCSP response using the endpoint-specific alias
+              value:
+                b64ocsp: BASE64_OR_PEM_OCSP_RESPONSE_FROM_THE_CALLER
+                format: json
+
+    TBSOCSPLintRequestBody:
+      description: A PEM/Base64 ResponseData form value and common linting options.
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '#/components/schemas/TBSOCSPLintRequest'
+          examples:
+            responseData:
+              summary: ResponseData using the endpoint-specific alias
+              value:
+                b64tbsocsp: BASE64_OR_PEM_RESPONSE_DATA_FROM_THE_CALLER
+                format: json
 
   responses:
     BadRequest:
@@ -377,17 +425,6 @@ components:
         severity:
           $ref: '#/components/schemas/FindingSeverity'
 
-    LintRequest:
-      allOf:
-        - $ref: '#/components/schemas/LintRequestOptions'
-        - type: object
-          required:
-            - b64input
-          properties:
-            b64input:
-              type: string
-              description: The caller's Base64 or PEM-encoded input.
-
     CertificateLintRequest:
       allOf:
         - $ref: '#/components/schemas/LintRequestOptions'
@@ -421,6 +458,74 @@ components:
                 - b64input
             - required:
                 - b64tbscert
+
+    CRLLintRequest:
+      allOf:
+        - $ref: '#/components/schemas/LintRequestOptions'
+        - type: object
+          properties:
+            b64input:
+              type: string
+              description: The caller's Base64 or PEM-encoded CRL.
+            b64crl:
+              type: string
+              description: Endpoint-specific alias for b64input; takes precedence when both are present.
+          anyOf:
+            - required:
+                - b64input
+            - required:
+                - b64crl
+
+    TBSCRLLintRequest:
+      allOf:
+        - $ref: '#/components/schemas/LintRequestOptions'
+        - type: object
+          properties:
+            b64input:
+              type: string
+              description: The caller's Base64 or PEM-encoded TBSCertList.
+            b64tbscrl:
+              type: string
+              description: Endpoint-specific alias for b64input; takes precedence when both are present.
+          anyOf:
+            - required:
+                - b64input
+            - required:
+                - b64tbscrl
+
+    OCSPLintRequest:
+      allOf:
+        - $ref: '#/components/schemas/LintRequestOptions'
+        - type: object
+          properties:
+            b64input:
+              type: string
+              description: The caller's Base64 or PEM-encoded OCSP response.
+            b64ocsp:
+              type: string
+              description: Endpoint-specific alias for b64input; takes precedence when both are present.
+          anyOf:
+            - required:
+                - b64input
+            - required:
+                - b64ocsp
+
+    TBSOCSPLintRequest:
+      allOf:
+        - $ref: '#/components/schemas/LintRequestOptions'
+        - type: object
+          properties:
+            b64input:
+              type: string
+              description: The caller's Base64 or PEM-encoded ResponseData.
+            b64tbsocsp:
+              type: string
+              description: Endpoint-specific alias for b64input; takes precedence when both are present.
+          anyOf:
+            - required:
+                - b64input
+            - required:
+                - b64tbsocsp
 
     LintResponse:
       type: array
