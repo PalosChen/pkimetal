@@ -12,19 +12,33 @@ import (
 )
 
 var (
-	OIDMTCProof         = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 0}
-	OIDCAID             = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 1}
-	OIDMTC_CA           = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 2}
-	OIDMLDSA44          = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 17}
-	OIDMLDSA65          = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 18}
-	OIDSHA256           = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
-	OIDUnsigned         = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 36}
-	OIDCommonName       = asn1.ObjectIdentifier{2, 5, 4, 3}
-	OIDKeyUsage         = asn1.ObjectIdentifier{2, 5, 29, 15}
-	OIDSubjectKeyID     = asn1.ObjectIdentifier{2, 5, 29, 14}
-	OIDBasicConstraints = asn1.ObjectIdentifier{2, 5, 29, 19}
-	OIDAuthorityKeyID   = asn1.ObjectIdentifier{2, 5, 29, 35}
-	OIDIssuerAltName    = asn1.ObjectIdentifier{2, 5, 29, 18}
+	OIDMTCProof            = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 0}
+	OIDCAID                = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 1}
+	OIDMTC_CA              = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 2}
+	OIDMLDSA44             = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 17}
+	OIDMLDSA65             = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 18}
+	OIDMLDSA87             = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 19}
+	OIDHashMLDSA44         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 32}
+	OIDHashMLDSA65         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 33}
+	OIDHashMLDSA87         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 34}
+	OIDRSAEncryption       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
+	OIDSHA256              = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
+	OIDUnsigned            = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 36}
+	OIDCommonName          = asn1.ObjectIdentifier{2, 5, 4, 3}
+	OIDKeyUsage            = asn1.ObjectIdentifier{2, 5, 29, 15}
+	OIDSubjectKeyID        = asn1.ObjectIdentifier{2, 5, 29, 14}
+	OIDBasicConstraints    = asn1.ObjectIdentifier{2, 5, 29, 19}
+	OIDAuthorityKeyID      = asn1.ObjectIdentifier{2, 5, 29, 35}
+	OIDIssuerAltName       = asn1.ObjectIdentifier{2, 5, 29, 18}
+	OIDCertificatePolicies = asn1.ObjectIdentifier{2, 5, 29, 32}
+	OIDExtendedKeyUsage    = asn1.ObjectIdentifier{2, 5, 29, 37}
+	OIDServerAuth          = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1}
+	OIDSCTList             = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 2}
+	OIDOrganizationName    = asn1.ObjectIdentifier{2, 5, 4, 10}
+	OIDCountryName         = asn1.ObjectIdentifier{2, 5, 4, 6}
+	OIDPolicyDV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 1}
+	OIDPolicyOV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 2}
+	OIDPolicyIV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 3}
 )
 
 type Algorithm struct {
@@ -96,7 +110,18 @@ func ValidSubscriberTemplate() Template {
 }
 
 func ValidCQRPSubscriberTemplate() Template {
-	return ValidSubscriberTemplate()
+	tpl := ValidSubscriberTemplate()
+	tpl.Extensions = append(tpl.Extensions,
+		Extension{ID: OIDCertificatePolicies, Value: CertificatePoliciesDER(OIDPolicyDV)},
+		Extension{ID: OIDExtendedKeyUsage, Value: ExtendedKeyUsageDER(OIDServerAuth)},
+	)
+	return tpl
+}
+
+func ValidCQRPCATemplate() Template {
+	tpl := ValidCATemplate()
+	tpl.SPKIAlgorithm = Algorithm{OID: OIDMLDSA44}
+	return tpl
 }
 
 func ValidProof() Proof {
@@ -196,6 +221,44 @@ func BasicConstraintsDER(ca bool) []byte {
 
 func SubjectKeyIdentifierDER(id []byte) []byte {
 	return der(0x04, clone(id))
+}
+
+func CertificatePoliciesDER(ids ...asn1.ObjectIdentifier) []byte {
+	policies := make([][]byte, 0, len(ids))
+	for _, id := range ids {
+		policies = append(policies, der(0x30, mustMarshal(id)))
+	}
+	return der(0x30, policies...)
+}
+
+func ExtendedKeyUsageDER(ids ...asn1.ObjectIdentifier) []byte {
+	encoded := make([][]byte, 0, len(ids))
+	for _, id := range ids {
+		encoded = append(encoded, mustMarshal(id))
+	}
+	return der(0x30, encoded...)
+}
+
+type NameAttribute struct {
+	ID    asn1.ObjectIdentifier
+	Value string
+}
+
+func NameDER(attributes ...NameAttribute) []byte {
+	rdns := make([][]byte, 0, len(attributes))
+	for _, attribute := range attributes {
+		atv := der(0x30, mustMarshal(attribute.ID), mustMarshal(attribute.Value))
+		rdns = append(rdns, der(0x31, atv))
+	}
+	return der(0x30, rdns...)
+}
+
+func DirectoryNameGeneralNameDER(name []byte) []byte {
+	return der(0xa4, clone(name))
+}
+
+func GeneralNamesDER(names ...[]byte) []byte {
+	return der(0x30, names...)
 }
 
 func Certificate(tpl Template) []byte {
