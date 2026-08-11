@@ -12,6 +12,7 @@ import (
 	"github.com/pkimetal/pkimetal/health"
 	"github.com/pkimetal/pkimetal/linter"
 	"github.com/pkimetal/pkimetal/logger"
+	"github.com/pkimetal/pkimetal/mtc"
 	"github.com/pkimetal/pkimetal/utils"
 
 	json "github.com/goccy/go-json"
@@ -29,6 +30,7 @@ type RequestInfo struct {
 	b64Input     []byte // PEM or base64-encoded string.
 	decodedInput []byte
 	cert         *x509.Certificate
+	mtcArtifact  *mtc.Artifact
 }
 
 type LintResult struct {
@@ -89,6 +91,7 @@ func POST(fhctx *fasthttp.RequestCtx, path string) int {
 				B64Input:     utils.B2S(ri.b64Input),
 				DecodedInput: ri.decodedInput,
 				Cert:         ri.cert,
+				MTCArtifact:  ri.mtcArtifact,
 				ProfileId:    ri.profileId,
 				QueuedAt:     time.Now(),
 				RespChannel:  make(chan linter.LintingResult),

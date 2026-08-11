@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/pkimetal/pkimetal/mtc"
 	"github.com/pkimetal/pkimetal/utils"
 
 	"github.com/zmap/zcrypto/encoding/asn1"
@@ -27,43 +28,72 @@ func (ri *RequestInfo) parseCertificateInput() (cert *x509.Certificate, err erro
 		return
 	}
 
-	// Process the input based on the endpoint.
+	var inputKind mtc.InputKind
 	switch ri.endpoint {
 	case ENDPOINT_LINTTBSCERT:
-		if err = ri.makeDummyCertificate(); err != nil {
-			return
-		}
+		inputKind = mtc.InputTBSCertificate
 	case ENDPOINT_LINTCERT:
+		inputKind = mtc.InputCertificate
 	default:
 		err = fmt.Errorf("invalid endpoint for certificate input")
 		return
 	}
 
-	// Update the Base64 input field from the processed input, which will ensure that PEM encapsulation boundaries are present.
-	ri.b64Input = pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: ri.decodedInput,
-	})
+	processed, cert, artifact, err := parseCertificateBytes(ri.decodedInput, inputKind, x509.ParseCertificate)
+	ri.mtcArtifact = artifact
+	if processed != nil {
+		ri.decodedInput = processed
+		// Preserve the existing normalized representation for linter fanout.
+		ri.b64Input = pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: processed,
+		})
+	}
+	return
+}
 
-	// Parse the certificate, recovering from any panics that may occur during parsing.
+func parseCertificateBytes(decoded []byte, inputKind mtc.InputKind, parseLegacy func([]byte) (*x509.Certificate, error)) (processed []byte, cert *x509.Certificate, artifact *mtc.Artifact, err error) {
+	artifact, mtcErr := mtc.Parse(decoded, inputKind)
+	if mtcErr == nil && (artifact.Kind == mtc.ArtifactCA || artifact.Kind == mtc.ArtifactSubscriber) {
+		return decoded, nil, artifact, nil
+	}
+
+	processed = decoded
+	if inputKind == mtc.InputTBSCertificate {
+		if processed, err = makeDummyCertificateBytes(decoded); err != nil {
+			return nil, nil, nil, err
+		}
+	} else if inputKind != mtc.InputCertificate {
+		return nil, nil, nil, fmt.Errorf("unsupported certificate input kind %d", inputKind)
+	}
+
+	cert, err = parseLegacyCertificate(processed, parseLegacy)
+	return processed, cert, nil, err
+}
+
+func parseLegacyCertificate(input []byte, parseLegacy func([]byte) (*x509.Certificate, error)) (cert *x509.Certificate, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recovered from panic while parsing certificate: %v", r)
 		}
 	}()
-	cert, err = x509.ParseCertificate(ri.decodedInput)
-	return
+	return parseLegacy(input)
 }
 
 func (ri *RequestInfo) makeDummyCertificate() error {
+	var err error
+	ri.decodedInput, err = makeDummyCertificateBytes(ri.decodedInput)
+	return err
+}
+
+func makeDummyCertificateBytes(decoded []byte) ([]byte, error) {
 	// Decode enough of the TBSCertificate to discover the signature algorithm.
 	var tbs tbsCertificatePartial
 	var err error
-	if _, err = asn1.Unmarshal(ri.decodedInput, &tbs); err != nil {
-		return err
+	if _, err = asn1.Unmarshal(decoded, &tbs); err != nil {
+		return nil, err
 	}
 
 	// Wrap the TBSCertificate in a dummy signature.
-	ri.decodedInput, err = dummySign(ri.decodedInput, tbs.SignatureAlgorithm)
-	return err
+	return dummySign(decoded, tbs.SignatureAlgorithm)
 }

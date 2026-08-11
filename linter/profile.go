@@ -129,6 +129,11 @@ const (
 	BIMIGROUP_LEAF_COMMONMARK_PRECERTIFICATE
 	BIMIGROUP_LEAF_VERIFIEDMARK
 	BIMIGROUP_LEAF_VERIFIEDMARK_PRECERTIFICATE
+	// Merkle Tree Certificates.
+	MTC_CA
+	MTC_SUBSCRIBER
+	CQRP_MTC_CA
+	CQRP_MTC_SUBSCRIBER
 )
 
 var (
@@ -246,6 +251,11 @@ var (
 		BIMIGROUP_LEAF_COMMONMARK_PRECERTIFICATE:   {Name: "bimigroup_leaf_commonmark_precertificate", Source: "Mark Certificate Guidelines", Description: "Common Mark Precertificate"},
 		BIMIGROUP_LEAF_VERIFIEDMARK:                {Name: "bimigroup_leaf_verifiedmark", Source: "Mark Certificate Guidelines", Description: "Verified Mark Certificate"},
 		BIMIGROUP_LEAF_VERIFIEDMARK_PRECERTIFICATE: {Name: "bimigroup_leaf_verifiedmark_precertificate", Source: "Mark Certificate Guidelines", Description: "Verified Mark Precertificate"},
+		// Merkle Tree Certificates.
+		MTC_CA:              {Name: "mtc_ca", Source: "draft-ietf-plants-merkle-tree-certs-05", Description: "MTC Certification Authority Certificate"},
+		MTC_SUBSCRIBER:      {Name: "mtc_subscriber", Source: "draft-ietf-plants-merkle-tree-certs-05", Description: "MTC Subscriber Certificate"},
+		CQRP_MTC_CA:         {Name: "cqrp_mtc_ca", Source: "CQRP v0.2.0", Description: "CQRP MTC CA Cosigning Certificate"},
+		CQRP_MTC_SUBSCRIBER: {Name: "cqrp_mtc_subscriber", Source: "CQRP v0.2.0", Description: "CQRP MTC Subscriber TLS Certificate"},
 	}
 
 	AllProfilesOrdered                                                               []Profile

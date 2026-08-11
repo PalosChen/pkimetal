@@ -14,6 +14,7 @@ import (
 
 	"github.com/pkimetal/pkimetal/config"
 	"github.com/pkimetal/pkimetal/logger"
+	"github.com/pkimetal/pkimetal/mtc"
 	"github.com/pkimetal/pkimetal/utils"
 
 	json "github.com/goccy/go-json"
@@ -61,6 +62,7 @@ type LintingRequest struct {
 	B64Input       string
 	DecodedInput   []byte
 	Cert           *x509.Certificate
+	MTCArtifact    *mtc.Artifact
 	ProfileId      ProfileId
 	QueuedAt       time.Time
 	ChecksAdded    []string

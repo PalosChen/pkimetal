@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 
 	"github.com/pkimetal/pkimetal/linter"
+	"github.com/pkimetal/pkimetal/mtc"
 
 	"github.com/crtsh/ccadb_data"
 	"github.com/zmap/zcrypto/encoding/asn1"
@@ -196,6 +197,16 @@ func (ri *RequestInfo) GetProfile(profileName string) bool {
 
 	// Perform profile autodetection, if necessary.
 	if ri.profileId == linter.AUTODETECT {
+		if ri.mtcArtifact != nil {
+			switch ri.mtcArtifact.Kind {
+			case mtc.ArtifactCA:
+				ri.profileId = linter.MTC_CA
+			case mtc.ArtifactSubscriber:
+				ri.profileId = linter.MTC_SUBSCRIBER
+			}
+			return true
+		}
+
 		switch ri.endpoint {
 		case ENDPOINT_LINTCRL, ENDPOINT_LINTTBSCRL:
 			ri.profileId = ri.detectCRLProfile()
