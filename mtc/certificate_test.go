@@ -298,7 +298,6 @@ func TestParseCAIDNameRequiresExactShape(t *testing.T) {
 		{"non-ASCII digit", nameWithCAIDValue(utf8StringDER("1.\uff11"))},
 		{"sign", nameWithCAIDValue(utf8StringDER("1.+2"))},
 		{"whitespace", nameWithCAIDValue(utf8StringDER("1. 2"))},
-		{"uint64 overflow", nameWithCAIDValue(utf8StringDER("18446744073709551616.1"))},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -306,6 +305,33 @@ func TestParseCAIDNameRequiresExactShape(t *testing.T) {
 				t.Fatalf("accepted malformed CA-ID Name %x", tc.input)
 			}
 		})
+	}
+}
+
+func TestParseCAIDNameAcceptsArbitraryPrecisionArc(t *testing.T) {
+	got, err := mtc.ParseCAIDName(nameWithCAIDValue(utf8StringDER("18446744073709551616.1")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []byte{0x82, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00, 0x01}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("CA ID = %x, want %x", got, want)
+	}
+}
+
+func TestParseCAIDNameEnforcesBinaryLengthLimit(t *testing.T) {
+	maximum := strings.TrimSuffix(strings.Repeat("1.", 255), ".")
+	got, err := mtc.ParseCAIDName(nameWithCAIDValue(utf8StringDER(maximum)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 255 {
+		t.Fatalf("CA ID length = %d, want 255", len(got))
+	}
+
+	tooLong := strings.TrimSuffix(strings.Repeat("1.", 256), ".")
+	if _, err := mtc.ParseCAIDName(nameWithCAIDValue(utf8StringDER(tooLong))); err == nil {
+		t.Fatal("accepted a 256-byte binary CA ID")
 	}
 }
 
@@ -457,14 +483,26 @@ func nameWithCAIDValue(value []byte) []byte {
 	if err != nil {
 		panic(err)
 	}
-	atv := append(append([]byte{0x30, byte(len(oid) + len(value))}, oid...), value...)
-	set := append([]byte{0x31, byte(len(atv))}, atv...)
-	return append([]byte{0x30, byte(len(set))}, set...)
+	atv := testDERValue(0x30, oid, value)
+	return testDERValue(0x30, testDERValue(0x31, atv))
 }
 
 func utf8StringDER(value string) []byte {
-	if len(value) >= 128 {
-		panic("utf8StringDER only supports short values")
+	return testDERValue(0x0c, []byte(value))
+}
+
+func testDERValue(tag byte, values ...[]byte) []byte {
+	contents := bytes.Join(values, nil)
+	if len(contents) < 128 {
+		return append([]byte{tag, byte(len(contents))}, contents...)
 	}
-	return append([]byte{0x0c, byte(len(value))}, value...)
+	var encoded [8]byte
+	i := len(encoded)
+	for length := len(contents); length != 0; length >>= 8 {
+		i--
+		encoded[i] = byte(length)
+	}
+	result := []byte{tag, 0x80 | byte(len(encoded)-i)}
+	result = append(result, encoded[i:]...)
+	return append(result, contents...)
 }

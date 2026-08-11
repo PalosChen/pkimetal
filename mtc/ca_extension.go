@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strconv"
 )
+
+const maxTrustAnchorIDLength = 255
 
 func ParseCAIDName(input []byte) ([]byte, error) {
 	root, err := parseExactDER(append([]byte(nil), input...))
@@ -88,9 +89,16 @@ func encodeRelativeOID(text []byte) ([]byte, error) {
 				return nil, errors.New("CA-ID attribute value is not an ASCII dotted-decimal identifier")
 			}
 		}
-		value, err := strconv.ParseUint(string(arc), 10, 64)
-		if err != nil {
-			return nil, errors.New("CA-ID attribute value arc overflows uint64")
+		value, ok := new(big.Int).SetString(string(arc), 10)
+		if !ok {
+			return nil, errors.New("CA-ID attribute value contains an invalid arc")
+		}
+		encodedLength := (value.BitLen() + 6) / 7
+		if encodedLength == 0 {
+			encodedLength = 1
+		}
+		if len(encoded)+encodedLength > maxTrustAnchorIDLength {
+			return nil, errors.New("CA-ID binary representation exceeds 255 bytes")
 		}
 		encoded = appendBase128(encoded, value)
 		if dot == len(text) {
@@ -104,15 +112,21 @@ func encodeRelativeOID(text []byte) ([]byte, error) {
 	return encoded, nil
 }
 
-func appendBase128(output []byte, value uint64) []byte {
-	var encoded [10]byte
-	i := len(encoded) - 1
-	encoded[i] = byte(value & 0x7f)
-	for value >>= 7; value != 0; value >>= 7 {
-		i--
-		encoded[i] = byte(value&0x7f) | 0x80
+func appendBase128(output []byte, value *big.Int) []byte {
+	length := (value.BitLen() + 6) / 7
+	if length == 0 {
+		return append(output, 0)
 	}
-	return append(output, encoded[i:]...)
+	encoded := make([]byte, length)
+	remaining := new(big.Int).Set(value)
+	for i := len(encoded) - 1; i >= 0; i-- {
+		encoded[i] = byte(remaining.Uint64() & 0x7f)
+		if i != len(encoded)-1 {
+			encoded[i] |= 0x80
+		}
+		remaining.Rsh(remaining, 7)
+	}
+	return append(output, encoded...)
 }
 
 func ParseCertificationAuthorityExtension(input []byte) (*CertificationAuthority, error) {
