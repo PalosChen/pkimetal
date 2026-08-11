@@ -16,6 +16,7 @@ func init() {
 		Name:         "cqrplint",
 		Version:      "v0.2.0",
 		Url:          "https://github.com/pkimetal/pkimetal/blob/main/doc/superpowers/specs/2026-08-11-mtc-pkimetal-design.md#source-baselines",
+		Supported:    []linter.ProfileId{linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER},
 		Unsupported:  mtcadapter.UnsupportedProfiles(linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER),
 		NumInstances: config.Config.Linter.Cqrplint.NumGoroutines,
 		Interface:    func() linter.LinterInterface { return &CQRPLint{} },

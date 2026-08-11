@@ -26,7 +26,19 @@ var (
 	cabforumTLSLeafRegistry        lint.Registry
 	cabforumTLSArlRegistry         lint.Registry
 	notCabforumRegistry            lint.Registry
+	mtcNonCABFRegistry             lint.Registry
+	cqrpMTCLeafRegistry            lint.Registry
 )
+
+func zlintApplicable(req *linter.LintingRequest) (bool, string) {
+	if req == nil {
+		return false, ""
+	}
+	if linter.IsMTCProfile(req.ProfileId) && req.Cert == nil {
+		return false, "zcrypto could not safely parse this MTC artifact"
+	}
+	return true, ""
+}
 
 func init() {
 	// Register zlint.
@@ -34,7 +46,9 @@ func init() {
 		Name:         "zlint",
 		Version:      linter.GetPackageVersion("github.com/zmap/zlint"),
 		Url:          "https://github.com/zmap/zlint",
+		Supported:    []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER},
 		Unsupported:  nil,
+		Applicable:   zlintApplicable,
 		NumInstances: config.Config.Linter.Zlint.NumGoroutines,
 		Interface:    func() linter.LinterInterface { return &Zlint{} },
 	}).Register()
@@ -79,6 +93,28 @@ SubscriberCRL = false
 		},
 	}); err != nil {
 		logger.Logger.Fatal("Failed to configure filtered zlint registry for disabling CABForum lints", zap.Error(err))
+	}
+
+	if mtcNonCABFRegistry, err = defaultRegistry.Filter(lint.FilterOptions{
+		ExcludeSources: []lint.LintSource{
+			lint.CABFBaselineRequirements,
+			lint.CABFEVGuidelines,
+			lint.CABFSMIMEBaselineRequirements,
+			lint.CABFCSBaselineRequirements,
+		},
+	}); err != nil {
+		logger.Logger.Fatal("Failed to configure filtered zlint registry for MTC certificates", zap.Error(err))
+	}
+
+	if cqrpMTCLeafRegistry, err = cabforumTLSLeafRegistry.Filter(lint.FilterOptions{
+		ExcludeNames: []string{
+			"e_signature_algorithm_not_supported",
+			"e_public_key_type_not_allowed",
+			"e_algorithm_identifier_improper_encoding",
+			"w_ct_sct_policy_count_unsatisfied",
+		},
+	}); err != nil {
+		logger.Logger.Fatal("Failed to configure filtered zlint registry for CQRP MTC subscriber certificates", zap.Error(err))
 	}
 }
 
@@ -181,26 +217,40 @@ func lintOCSPResponse(lreq *linter.LintingRequest, registry *lint.Registry) []li
 	return lres
 }
 
-func (l *Zlint) HandleRequest(ctx context.Context, lin *linter.LinterInstance, lreq *linter.LintingRequest) []linter.LintingResult {
-	var registry *lint.Registry
-	if slices.Contains(linter.TbrTevgLeafProfileIDs, lreq.ProfileId) {
-		registry = &cabforumTLSLeafRegistry
-	} else if slices.Contains(linter.TbrTevgCertificateProfileIDs, lreq.ProfileId) {
-		registry = &cabforumTLSSubordinateRegistry
-	} else if slices.Contains(linter.TbrArlProfileIDs, lreq.ProfileId) {
-		registry = &cabforumTLSArlRegistry
-	} else if slices.Contains(linter.NonCabforumProfileIDs, lreq.ProfileId) {
-		registry = &notCabforumRegistry
-	} else {
-		registry = &defaultRegistry
+func registryForProfile(profile linter.ProfileId) lint.Registry {
+	switch profile {
+	case linter.CQRP_MTC_SUBSCRIBER:
+		return cqrpMTCLeafRegistry
+	case linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA:
+		return mtcNonCABFRegistry
 	}
 
-	if slices.Contains(linter.OcspProfileIDs, lreq.ProfileId) {
-		return lintOCSPResponse(lreq, registry)
-	} else if slices.Contains(linter.CrlProfileIDs, lreq.ProfileId) {
-		return lintCRL(lreq, registry)
+	if slices.Contains(linter.TbrTevgLeafProfileIDs, profile) {
+		return cabforumTLSLeafRegistry
+	} else if slices.Contains(linter.TbrTevgCertificateProfileIDs, profile) {
+		return cabforumTLSSubordinateRegistry
+	} else if slices.Contains(linter.TbrArlProfileIDs, profile) {
+		return cabforumTLSArlRegistry
+	} else if slices.Contains(linter.NonCabforumProfileIDs, profile) {
+		return notCabforumRegistry
 	} else {
-		return lintCert(lreq, registry)
+		return defaultRegistry
+	}
+}
+
+func (l *Zlint) HandleRequest(ctx context.Context, lin *linter.LinterInstance, lreq *linter.LintingRequest) []linter.LintingResult {
+	if lreq == nil || (linter.IsMTCProfile(lreq.ProfileId) && lreq.Cert == nil) {
+		return nil
+	}
+
+	registry := registryForProfile(lreq.ProfileId)
+
+	if slices.Contains(linter.OcspProfileIDs, lreq.ProfileId) {
+		return lintOCSPResponse(lreq, &registry)
+	} else if slices.Contains(linter.CrlProfileIDs, lreq.ProfileId) {
+		return lintCRL(lreq, &registry)
+	} else {
+		return lintCert(lreq, &registry)
 	}
 }
 

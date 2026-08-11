@@ -17,6 +17,7 @@ func init() {
 		Name:         "mtclint",
 		Version:      "draft-05",
 		Url:          "https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05",
+		Supported:    []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER},
 		Unsupported:  mtcadapter.UnsupportedProfiles(linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER),
 		NumInstances: config.Config.Linter.Mtclint.NumGoroutines,
 		Interface:    func() linter.LinterInterface { return &MTCLint{} },

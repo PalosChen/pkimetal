@@ -3,7 +3,6 @@ package request
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -101,14 +100,19 @@ func POST(fhctx *fasthttp.RequestCtx, path string) int {
 			var lresp []linter.LintingResult
 			nlresp := 0
 			for _, l := range linter.Linters {
-				if isApplicable := !slices.Contains(l.Unsupported, lreq.ProfileId); isApplicable && (l.NumInstances > 0) {
+				isApplicable, reason := l.EvaluateApplicability(&lreq)
+				if isApplicable && (l.NumInstances > 0) {
 					l.ReqChannel <- lreq
 					nlresp++
 				} else {
+					finding := fmt.Sprintf("%s: Not used [Available:%t, Applicable:%t]", l.Name, (l.NumInstances > 0), isApplicable)
+					if reason != "" {
+						finding += fmt.Sprintf(" [Reason:%s]", reason)
+					}
 					lresp = append(lresp, linter.LintingResult{
 						LinterName: l.Name,
 						Severity:   linter.SEVERITY_META,
-						Finding:    fmt.Sprintf("%s: Not used [Available:%t, Applicable:%t]", l.Name, (l.NumInstances > 0), isApplicable),
+						Finding:    finding,
 					})
 				}
 			}

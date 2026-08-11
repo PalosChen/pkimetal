@@ -34,9 +34,12 @@ func TestRegistration(t *testing.T) {
 	}
 
 	supported := []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER}
+	if !slices.Equal(got.Supported, supported) {
+		t.Errorf("supported = %#v, want %#v", got.Supported, supported)
+	}
 	for id := range linter.AllProfiles {
-		if gotUnsupported := slices.Contains(got.Unsupported, id); gotUnsupported == slices.Contains(supported, id) {
-			t.Errorf("profile %s unsupported = %t", linter.AllProfiles[id].Name, gotUnsupported)
+		if gotSupported := got.Supports(id); gotSupported != slices.Contains(supported, id) {
+			t.Errorf("profile %s supported = %t", linter.AllProfiles[id].Name, gotSupported)
 		}
 	}
 }

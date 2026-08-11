@@ -327,9 +327,18 @@ func ProfileIDList(list []ProfileId) string {
 	return s.String()[1:]
 }
 
+func IsMTCProfile(profile ProfileId) bool {
+	switch profile {
+	case MTC_CA, MTC_SUBSCRIBER, CQRP_MTC_CA, CQRP_MTC_SUBSCRIBER:
+		return true
+	default:
+		return false
+	}
+}
+
 func registerLinterWithProfiles(linter *Linter) {
 	for id, profile := range AllProfiles {
-		if !slices.Contains(linter.Unsupported, id) {
+		if linter.Supports(id) {
 			profile.Linters = append(profile.Linters, &linter.Name)
 			AllProfiles[id] = profile
 		}

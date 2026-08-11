@@ -382,6 +382,7 @@ func postAndCaptureMTCRequest(t *testing.T, decoded []byte, profile string) lint
 	reqChannel := make(chan linter.LintingRequest, 1)
 	linter.Linters = linter.LinterSlice{{
 		Name:         "capture",
+		Supported:    []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER},
 		NumInstances: 1,
 		ReqChannel:   reqChannel,
 	}}

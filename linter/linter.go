@@ -7,6 +7,7 @@ import (
 	"io"
 	"os/exec"
 	"runtime/debug"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -36,7 +37,9 @@ type Linter struct {
 	Name                  string
 	Version               string
 	Url                   string
+	Supported             []ProfileId
 	Unsupported           []ProfileId
+	Applicable            func(*LintingRequest) (bool, string)
 	NumInstances          int
 	ReqChannel            chan LintingRequest
 	external              bool
@@ -44,6 +47,41 @@ type Linter struct {
 	queueTimeSummary      prometheus.Summary
 	processingTimeSummary prometheus.Summary
 	Interface             func() LinterInterface
+}
+
+const (
+	unsupportedMTCProfileReason = "MTC profile is not explicitly supported"
+	nilLinterReason             = "linter is nil"
+	nilLintingRequestReason     = "linting request is nil"
+)
+
+func (l *Linter) Supports(profile ProfileId) bool {
+	if l == nil {
+		return false
+	}
+	if IsMTCProfile(profile) {
+		return slices.Contains(l.Supported, profile)
+	}
+	return !slices.Contains(l.Unsupported, profile)
+}
+
+func (l *Linter) EvaluateApplicability(req *LintingRequest) (bool, string) {
+	if l == nil {
+		return false, nilLinterReason
+	}
+	if req == nil {
+		return false, nilLintingRequestReason
+	}
+	if !l.Supports(req.ProfileId) {
+		if IsMTCProfile(req.ProfileId) {
+			return false, unsupportedMTCProfileReason
+		}
+		return false, ""
+	}
+	if l.Applicable != nil {
+		return l.Applicable(req)
+	}
+	return true, ""
 }
 
 type LinterSlice []*Linter
