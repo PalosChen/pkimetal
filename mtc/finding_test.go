@@ -32,6 +32,9 @@ func TestRunRulesRecoversPanicsAndContinues(t *testing.T) {
 	if got[1].Code != "b_mtc_rule_panic" || got[1].Severity != Bug {
 		t.Fatalf("panic finding = %#v", got[1])
 	}
+	if got[1].Field != "" || got[1].Source != "test source" || got[1].Section != "1" {
+		t.Fatalf("panic finding metadata = %#v", got[1])
+	}
 	if !strings.Contains(got[1].Message, "z_panics") {
 		t.Fatalf("panic message does not identify rule: %q", got[1].Message)
 	}
@@ -124,58 +127,36 @@ func TestRunRulesSortTieBreakers(t *testing.T) {
 }
 
 func TestDraft05RegistersEveryRequiredRule(t *testing.T) {
-	want := map[string]bool{
-		"e_mtc_signature_algorithm_oid":                       false,
-		"e_mtc_signature_algorithm_parameters_present":        false,
-		"e_mtc_cert_signature_algorithm_mismatch":             false,
-		"e_mtc_signature_value_unused_bits":                   false,
-		"e_mtc_ca_subject_not_ca_id":                          false,
-		"e_mtc_ca_extension_missing":                          false,
-		"e_mtc_ca_extension_not_critical":                     false,
-		"f_mtc_ca_extension_malformed":                        false,
-		"e_mtc_ca_serial_range_invalid":                       false,
-		"e_mtc_ca_key_usage_missing":                          false,
-		"e_mtc_ca_key_cert_sign_missing":                      false,
-		"e_mtc_ca_basic_constraints_missing":                  false,
-		"e_mtc_ca_basic_constraints_not_ca":                   false,
-		"w_mtc_ca_ski_not_ca_id":                              false,
-		"w_mtc_ca_self_issued":                                false,
-		"e_mtc_subscriber_issuer_not_ca_id":                   false,
-		"e_mtc_serial_non_positive":                           false,
-		"e_mtc_serial_too_large":                              false,
-		"e_mtc_serial_log_number_zero":                        false,
-		"f_mtc_proof_malformed":                               false,
-		"e_mtc_proof_range_invalid":                           false,
-		"e_mtc_proof_subtree_invalid":                         false,
-		"e_mtc_proof_index_outside_range":                     false,
-		"e_mtc_proof_extensions_order":                        false,
-		"e_mtc_proof_extensions_duplicate":                    false,
-		"e_mtc_proof_cosigner_id_empty":                       false,
-		"e_mtc_proof_cosigner_order":                          false,
-		"e_mtc_proof_cosigner_duplicate":                      false,
-		"e_rfc9925_unsigned_algorithm_mismatch":               false,
-		"e_rfc9925_unsigned_parameters_present":               false,
-		"e_rfc9925_unsigned_signature_not_empty":              false,
-		"e_rfc9925_unsigned_issuer_unique_id_present":         false,
-		"w_rfc9925_unsigned_authority_key_identifier_present": false,
-		"w_rfc9925_unsigned_issuer_alternative_name_present":  false,
+	want := make(map[string]findingExpectation)
+	for id, expectation := range draft05Expectations {
+		if previous, ok := want[expectation.Code]; ok {
+			if previous.Source != expectation.Source || previous.Section != expectation.Section || previous.Severity != expectation.Severity {
+				t.Fatalf("expectation %q conflicts with another variant for %q", id, expectation.Code)
+			}
+			continue
+		}
+		want[expectation.Code] = expectation
 	}
+	seen := make(map[string]bool, len(want))
 	for _, rule := range draft05Rules {
-		seen, ok := want[rule.Code]
+		expectation, ok := want[rule.Code]
 		if !ok {
 			t.Errorf("unexpected rule %q", rule.Code)
 			continue
 		}
-		if seen {
+		if seen[rule.Code] {
 			t.Errorf("duplicate rule %q", rule.Code)
 		}
-		want[rule.Code] = true
+		seen[rule.Code] = true
+		if rule.Source != expectation.Source || rule.Section != expectation.Section {
+			t.Errorf("rule %q metadata = %q/%q, want %q/%q", rule.Code, rule.Source, rule.Section, expectation.Source, expectation.Section)
+		}
 		if rule.Code == "" || rule.Source == "" || rule.Section == "" || len(rule.Kinds) == 0 || len(rule.InputKinds) == 0 || rule.Evaluate == nil {
 			t.Errorf("rule %q has incomplete metadata or applicability: %#v", rule.Code, rule)
 		}
 	}
-	for code, seen := range want {
-		if !seen {
+	for code := range want {
+		if !seen[code] {
 			t.Errorf("missing rule %q", code)
 		}
 	}
