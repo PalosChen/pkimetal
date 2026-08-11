@@ -124,6 +124,9 @@ baseline remains the user-supplied local draft described above.
 
 ### Dispatcher and rule-runner findings
 
+For the profile/artifact mismatch, Source and Section are emitted in the same
+bracketed wire prefix used by native rule findings.
+
 | Code | Source | Section | Artifact / profile | Input applicability | Field(s) | Severity | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `e_mtc_profile_artifact_mismatch` | pkimetal profile dispatch | Explicit MTC profile selection | CA or subscriber / all four MTC profiles | Certificate and TBS | profile | error | implemented |

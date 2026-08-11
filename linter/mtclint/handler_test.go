@@ -102,14 +102,14 @@ func TestExpectedProfileKindControlsRulesAndReportsMismatch(t *testing.T) {
 			name:        "CA artifact selected as subscriber",
 			profile:     linter.MTC_SUBSCRIBER,
 			template:    mtctest.ValidCATemplate(),
-			wantFinding: "Selected profile \"mtc_subscriber\" expects subscriber artifact; actual artifact kind is ca",
+			wantFinding: "[pkimetal profile dispatch §Explicit MTC profile selection] Selected profile \"mtc_subscriber\" expects subscriber artifact; actual artifact kind is ca",
 			wantCode:    "e_mtc_signature_algorithm_oid",
 		},
 		{
 			name:        "subscriber artifact selected as CQRP CA",
 			profile:     linter.CQRP_MTC_CA,
 			template:    mtctest.ValidSubscriberTemplate(),
-			wantFinding: "Selected profile \"cqrp_mtc_ca\" expects ca artifact; actual artifact kind is subscriber",
+			wantFinding: "[pkimetal profile dispatch §Explicit MTC profile selection] Selected profile \"cqrp_mtc_ca\" expects ca artifact; actual artifact kind is subscriber",
 			wantCode:    "e_mtc_ca_extension_missing",
 		},
 	}
@@ -136,7 +136,7 @@ func TestExpectedProfileKindControlsRulesAndReportsMismatch(t *testing.T) {
 
 func TestNilAndUnknownArtifactsReportMismatchWithoutPanicking(t *testing.T) {
 	want := linter.LintingResult{
-		Finding:  "Selected profile \"mtc_ca\" expects ca artifact; actual artifact kind is unrecognized",
+		Finding:  "[pkimetal profile dispatch §Explicit MTC profile selection] Selected profile \"mtc_ca\" expects ca artifact; actual artifact kind is unrecognized",
 		Field:    "profile",
 		Code:     "e_mtc_profile_artifact_mismatch",
 		Severity: linter.SEVERITY_ERROR,

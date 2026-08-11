@@ -431,17 +431,19 @@ func testMTCMalformedProof(t *testing.T, h *mtcHTTPTestServer) {
 
 func testMTCProfileMismatch(t *testing.T, h *mtcHTTPTestServer) {
 	for _, tc := range []struct {
-		name    string
-		profile string
-		input   []byte
+		name        string
+		profile     string
+		input       []byte
+		wantFinding string
 	}{
-		{"CA selected for subscriber", "mtc_ca", mtctest.Certificate(mtctest.ValidSubscriberTemplate())},
-		{"subscriber selected for CA", "mtc_subscriber", mtctest.Certificate(mtctest.ValidCATemplate())},
+		{"CA selected for subscriber", "mtc_ca", mtctest.Certificate(mtctest.ValidSubscriberTemplate()), `[pkimetal profile dispatch §Explicit MTC profile selection] Selected profile "mtc_ca" expects ca artifact; actual artifact kind is subscriber`},
+		{"subscriber selected for CA", "mtc_subscriber", mtctest.Certificate(mtctest.ValidCATemplate()), `[pkimetal profile dispatch §Explicit MTC profile selection] Selected profile "mtc_subscriber" expects subscriber artifact; actual artifact kind is ca`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			response := h.postJSON(t, mtcHTTPRequest{path: "/lintcert", profile: tc.profile, contentType: "application/pkix-cert", body: tc.input})
 			assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
 			assertFinding(t, response.results, "mtclint", "e_mtc_profile_artifact_mismatch", "error")
+			assertFindingExact(t, response.results, "mtclint", "e_mtc_profile_artifact_mismatch", tc.wantFinding)
 		})
 	}
 }
@@ -547,6 +549,19 @@ func assertFinding(t *testing.T, results []request.LintResult, name, code, sever
 		}
 	}
 	t.Errorf("missing %s finding %q with severity %s in %#v", name, code, severity, results)
+}
+
+func assertFindingExact(t *testing.T, results []request.LintResult, name, code, finding string) {
+	t.Helper()
+	for _, result := range results {
+		if result.Linter == name && result.Code == code {
+			if result.Finding != finding {
+				t.Errorf("%s finding %q text = %q, want %q", name, code, result.Finding, finding)
+			}
+			return
+		}
+	}
+	t.Errorf("missing %s finding %q in %#v", name, code, results)
 }
 
 func assertNoFindingCode(t *testing.T, results []request.LintResult, code string) {

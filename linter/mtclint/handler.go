@@ -12,6 +12,11 @@ import (
 
 type MTCLint struct{}
 
+const (
+	profileMismatchSource  = "pkimetal profile dispatch"
+	profileMismatchSection = "Explicit MTC profile selection"
+)
+
 func init() {
 	(&linter.Linter{
 		Name:         "mtclint",
@@ -43,7 +48,7 @@ func (l *MTCLint) HandleRequest(_ context.Context, _ *linter.LinterInstance, req
 	var results []linter.LintingResult
 	if req.MTCArtifact == nil || req.MTCArtifact.Kind != expected {
 		results = append(results, linter.LintingResult{
-			Finding:  fmt.Sprintf("Selected profile %q expects %s artifact; actual artifact kind is %s", profileName, artifactKindName(expected), actualArtifactKindName(req.MTCArtifact)),
+			Finding:  fmt.Sprintf("[%s §%s] Selected profile %q expects %s artifact; actual artifact kind is %s", profileMismatchSource, profileMismatchSection, profileName, artifactKindName(expected), actualArtifactKindName(req.MTCArtifact)),
 			Field:    "profile",
 			Code:     "e_mtc_profile_artifact_mismatch",
 			Severity: linter.SEVERITY_ERROR,
