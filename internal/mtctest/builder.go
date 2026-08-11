@@ -18,8 +18,13 @@ var (
 	OIDMLDSA44          = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 17}
 	OIDMLDSA65          = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 18}
 	OIDSHA256           = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
+	OIDUnsigned         = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 36}
 	OIDCommonName       = asn1.ObjectIdentifier{2, 5, 4, 3}
+	OIDKeyUsage         = asn1.ObjectIdentifier{2, 5, 29, 15}
+	OIDSubjectKeyID     = asn1.ObjectIdentifier{2, 5, 29, 14}
 	OIDBasicConstraints = asn1.ObjectIdentifier{2, 5, 29, 19}
+	OIDAuthorityKeyID   = asn1.ObjectIdentifier{2, 5, 29, 35}
+	OIDIssuerAltName    = asn1.ObjectIdentifier{2, 5, 29, 18}
 )
 
 type Algorithm struct {
@@ -132,14 +137,65 @@ func MalformedProofBytes() []byte {
 func ValidCATemplate() Template {
 	tpl := ValidSubscriberTemplate()
 	tpl.Serial = big.NewInt(42)
+	tpl.TBSSignature = Algorithm{OID: OIDMLDSA65}
+	tpl.OuterSignature = Algorithm{OID: OIDMLDSA65}
+	tpl.Issuer = der(0x30, nil)
 	tpl.Subject = ValidCAIDNameDER()
-	tpl.Extensions = []Extension{{
-		ID:       OIDMTC_CA,
-		Critical: true,
-		Value:    ValidCAExtensionDER(),
-	}}
+	tpl.Extensions = []Extension{
+		{ID: OIDMTC_CA, Critical: true, Value: ValidCAExtensionDER()},
+		{ID: OIDKeyUsage, Critical: true, Value: KeyUsageDER(true)},
+		{ID: OIDBasicConstraints, Critical: true, Value: BasicConstraintsDER(true)},
+	}
 	tpl.Signature = []byte{0x01, 0x02, 0x03}
 	return tpl
+}
+
+func ValidUnsignedCATemplate() Template {
+	tpl := ValidCATemplate()
+	tpl.TBSSignature = Algorithm{OID: OIDUnsigned}
+	tpl.OuterSignature = Algorithm{OID: OIDUnsigned}
+	tpl.Issuer = clone(tpl.Subject)
+	tpl.Signature = nil
+	return tpl
+}
+
+func ReplaceExtension(tpl *Template, extension Extension) {
+	for i := range tpl.Extensions {
+		if tpl.Extensions[i].ID.Equal(extension.ID) {
+			tpl.Extensions[i] = extension
+			return
+		}
+	}
+	tpl.Extensions = append(tpl.Extensions, extension)
+}
+
+func RemoveExtension(tpl *Template, id asn1.ObjectIdentifier) {
+	filtered := tpl.Extensions[:0]
+	for _, extension := range tpl.Extensions {
+		if !extension.ID.Equal(id) {
+			filtered = append(filtered, extension)
+		}
+	}
+	tpl.Extensions = filtered
+}
+
+func KeyUsageDER(keyCertSign bool) []byte {
+	bits := byte(0x80)
+	if keyCertSign {
+		bits |= 0x04
+	}
+	return bitString([]byte{bits}, 2)
+}
+
+func BasicConstraintsDER(ca bool) []byte {
+	if !ca {
+		return der(0x30, nil)
+	}
+	return der(0x30, []byte{0x01, 0x01, 0xff})
+}
+
+func SubjectKeyIdentifierDER(id []byte) []byte {
+	return der(0x04, clone(id))
 }
 
 func Certificate(tpl Template) []byte {
@@ -185,9 +241,13 @@ func TBSCertificate(tpl Template) []byte {
 }
 
 func ValidCAIDNameDER() []byte {
-	relativeOID := der(0x0d, []byte{0x88, 0x22, 0x38, 0x03})
+	relativeOID := der(0x0d, ValidCAID())
 	atv := der(0x30, mustMarshal(OIDCAID), relativeOID)
 	return der(0x30, der(0x31, atv))
+}
+
+func ValidCAID() []byte {
+	return []byte{0x88, 0x22, 0x38, 0x03}
 }
 
 func ValidCAExtensionDER() []byte {
