@@ -74,6 +74,10 @@ func POST(fhctx *fasthttp.RequestCtx, path string) int {
 		if !ri.GetPOSTEndpoint(path) {
 			status = fasthttp.StatusNotFound
 			logger.SetDetails(fhctx, zap.InfoLevel, "Invalid endpoint", nil, nil)
+			fhctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+			fhctx.SetStatusCode(status)
+			doneChan <- 0
+			return
 		} else if responseFormat = getResponseFormat(fhctx); responseFormat == -1 {
 			errorMessage = "Unrecognised response format"
 		} else if requestBody := fhctx.Request.Body(); len(requestBody) == 0 {
