@@ -55,7 +55,11 @@ func TestCQRP020ValidArtifactsHaveNoFindings(t *testing.T) {
 			} else {
 				input = mtctest.TBSCertificate(tc.tpl)
 			}
-			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, input, tc.kind)))
+			artifact := parseArtifact(t, input, tc.kind)
+			assertCQRPFindings(t, LintCQRP020(artifact))
+			if got := len(artifact.SubjectPublicKey.SubjectPublicKey); got != 1312 {
+				t.Fatalf("baseline ML-DSA-44 public key length = %d, want 1312", got)
+			}
 		})
 	}
 }
@@ -66,7 +70,16 @@ func TestCQRP020CARules(t *testing.T) {
 		mutate func(*mtctest.Template)
 		want   []string
 	}{
-		{"wrong algorithm", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA65} }, []string{"e_cqrp_ca_spki_algorithm"}},
+		{"wrong algorithm", func(x *mtctest.Template) {
+			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA65}
+			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1952)
+		}, []string{"e_cqrp_ca_spki_algorithm"}},
+		{"wrong public key length", func(x *mtctest.Template) {
+			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 32)
+		}, []string{"e_cqrp_ca_spki_encoding"}},
+		{"public key not byte aligned", func(x *mtctest.Template) {
+			x.SubjectPublicKeyUnused = 1
+		}, []string{"e_cqrp_ca_spki_encoding"}},
 		{"parameters and encoding", func(x *mtctest.Template) {
 			x.SPKIAlgorithm.ParametersPresent = true
 			x.SPKIAlgorithm.Parameters = []byte{0x05, 0x00}
@@ -80,6 +93,20 @@ func TestCQRP020CARules(t *testing.T) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDKeyUsage, Value: mtctest.KeyUsageDER(true)})
 		}, []string{"e_cqrp_ca_key_usage_not_critical"}},
 		{"key usage absent delegated to draft", func(x *mtctest.Template) { mtctest.RemoveExtension(x, mtctest.OIDKeyUsage) }, nil},
+		{"duplicate key usage critical then noncritical", func(x *mtctest.Template) {
+			mtctest.RemoveExtension(x, mtctest.OIDKeyUsage)
+			x.Extensions = append(x.Extensions,
+				mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(true)},
+				mtctest.Extension{ID: mtctest.OIDKeyUsage, Value: mtctest.KeyUsageDER(true)},
+			)
+		}, []string{"e_cqrp_ca_key_usage_not_critical"}},
+		{"duplicate key usage noncritical then critical", func(x *mtctest.Template) {
+			mtctest.RemoveExtension(x, mtctest.OIDKeyUsage)
+			x.Extensions = append(x.Extensions,
+				mtctest.Extension{ID: mtctest.OIDKeyUsage, Value: mtctest.KeyUsageDER(true)},
+				mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(true)},
+			)
+		}, []string{"e_cqrp_ca_key_usage_not_critical"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -102,11 +129,32 @@ func TestCQRP020SubscriberSPKIAndValidity(t *testing.T) {
 			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDRSAEncryption, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}
 		}, nil},
 		{"unknown traditional delegated", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: asn1.ObjectIdentifier{1, 2, 3, 4}} }, nil},
-		{"ML-DSA-44 exact", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA44} }, nil},
-		{"ML-DSA-65 exact", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA65} }, nil},
-		{"ML-DSA-87 exact", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA87} }, nil},
+		{"ML-DSA-44 exact", func(x *mtctest.Template) {
+			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA44}
+			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1312)
+		}, nil},
+		{"ML-DSA-65 exact", func(x *mtctest.Template) {
+			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA65}
+			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1952)
+		}, nil},
+		{"ML-DSA-87 exact", func(x *mtctest.Template) {
+			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA87}
+			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 2592)
+		}, nil},
+		{"ML-DSA-65 wrong public key length", func(x *mtctest.Template) {
+			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA65}
+			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1312)
+		}, []string{"e_cqrp_subscriber_mldsa_encoding"}},
+		{"ML-DSA-87 wrong public key length", func(x *mtctest.Template) {
+			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA87}
+			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1952)
+		}, []string{"e_cqrp_subscriber_mldsa_encoding"}},
+		{"ML-DSA public key not byte aligned", func(x *mtctest.Template) {
+			x.SubjectPublicKeyUnused = 1
+		}, []string{"e_cqrp_subscriber_mldsa_encoding"}},
 		{"ML-DSA parameters and encoding", func(x *mtctest.Template) {
 			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA65, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}
+			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1952)
 		}, []string{"e_cqrp_subscriber_mldsa_encoding", "e_cqrp_subscriber_mldsa_parameters_present"}},
 		{"HashML-DSA 44 dedicated", func(x *mtctest.Template) {
 			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDHashMLDSA44, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}
@@ -161,6 +209,34 @@ func TestCQRP020SubscriberPolicies(t *testing.T) {
 		{"multiple including invalid", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV, asn1.ObjectIdentifier{1, 2, 3})})
 		}, []string{"e_cqrp_subscriber_policy_identifier"}},
+		{"OV then invalid suppresses warning", func(x *mtctest.Template) {
+			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyOV, asn1.ObjectIdentifier{1, 2, 3})})
+		}, []string{"e_cqrp_subscriber_policy_identifier"}},
+		{"invalid then OV suppresses warning", func(x *mtctest.Template) {
+			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(asn1.ObjectIdentifier{1, 2, 3}, mtctest.OIDPolicyOV)})
+		}, []string{"e_cqrp_subscriber_policy_identifier"}},
+		{"DV then invalid still enforces empty subject", func(x *mtctest.Template) {
+			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV, asn1.ObjectIdentifier{1, 2, 3})})
+			x.Subject = mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, Value: "example"})
+		}, []string{"e_cqrp_subscriber_dv_subject_not_empty", "e_cqrp_subscriber_policy_identifier"}},
+		{"invalid then DV still enforces empty subject", func(x *mtctest.Template) {
+			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(asn1.ObjectIdentifier{1, 2, 3}, mtctest.OIDPolicyDV)})
+			x.Subject = mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, Value: "example"})
+		}, []string{"e_cqrp_subscriber_dv_subject_not_empty", "e_cqrp_subscriber_policy_identifier"}},
+		{"duplicate policies valid then critical invalid", func(x *mtctest.Template) {
+			mtctest.RemoveExtension(x, mtctest.OIDCertificatePolicies)
+			x.Extensions = append(x.Extensions,
+				mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV)},
+				mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Critical: true, Value: mtctest.CertificatePoliciesDER(asn1.ObjectIdentifier{1, 2, 3})},
+			)
+		}, []string{"e_cqrp_subscriber_policies_critical", "e_cqrp_subscriber_policy_identifier"}},
+		{"duplicate policies critical invalid then valid", func(x *mtctest.Template) {
+			mtctest.RemoveExtension(x, mtctest.OIDCertificatePolicies)
+			x.Extensions = append(x.Extensions,
+				mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Critical: true, Value: mtctest.CertificatePoliciesDER(asn1.ObjectIdentifier{1, 2, 3})},
+				mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV)},
+			)
+		}, []string{"e_cqrp_subscriber_policies_critical", "e_cqrp_subscriber_policy_identifier"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -193,9 +269,20 @@ func TestCQRP020SubscriberEKU(t *testing.T) {
 		{"malformed", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDExtendedKeyUsage, Value: []byte{0x30, 0x01, 0x00}})
 		}, []string{"e_cqrp_subscriber_eku_only_server_auth"}},
-		{"duplicate extension deferred", func(x *mtctest.Template) {
-			x.Extensions = append(x.Extensions, mtctest.Extension{ID: mtctest.OIDExtendedKeyUsage, Value: mtctest.ExtendedKeyUsageDER(asn1.ObjectIdentifier{1, 2, 3})})
-		}, nil},
+		{"duplicate EKU valid then critical invalid", func(x *mtctest.Template) {
+			mtctest.RemoveExtension(x, mtctest.OIDExtendedKeyUsage)
+			x.Extensions = append(x.Extensions,
+				mtctest.Extension{ID: mtctest.OIDExtendedKeyUsage, Value: mtctest.ExtendedKeyUsageDER(mtctest.OIDServerAuth)},
+				mtctest.Extension{ID: mtctest.OIDExtendedKeyUsage, Critical: true, Value: mtctest.ExtendedKeyUsageDER(asn1.ObjectIdentifier{1, 2, 3})},
+			)
+		}, []string{"e_cqrp_subscriber_eku_critical", "e_cqrp_subscriber_eku_only_server_auth"}},
+		{"duplicate EKU critical invalid then valid", func(x *mtctest.Template) {
+			mtctest.RemoveExtension(x, mtctest.OIDExtendedKeyUsage)
+			x.Extensions = append(x.Extensions,
+				mtctest.Extension{ID: mtctest.OIDExtendedKeyUsage, Critical: true, Value: mtctest.ExtendedKeyUsageDER(asn1.ObjectIdentifier{1, 2, 3})},
+				mtctest.Extension{ID: mtctest.OIDExtendedKeyUsage, Value: mtctest.ExtendedKeyUsageDER(mtctest.OIDServerAuth)},
+			)
+		}, []string{"e_cqrp_subscriber_eku_critical", "e_cqrp_subscriber_eku_only_server_auth"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -211,6 +298,7 @@ func TestCQRP020SubscriberIANAndSCT(t *testing.T) {
 		mtctest.NameAttribute{ID: mtctest.OIDOrganizationName, Value: "Example"},
 		mtctest.NameAttribute{ID: mtctest.OIDCommonName, Value: "Example Issuer"},
 	)
+	longUTF8 := append([]byte{0x0c, 0x41}, bytes.Repeat([]byte{'a'}, 65)...)
 	tests := []struct {
 		name   string
 		mutate func(*mtctest.Template)
@@ -219,6 +307,16 @@ func TestCQRP020SubscriberIANAndSCT(t *testing.T) {
 		{"valid O and CN", func(x *mtctest.Template) {
 			x.Extensions = append(x.Extensions, mtctest.Extension{ID: mtctest.OIDIssuerAltName, Value: mtctest.GeneralNamesDER(mtctest.DirectoryNameGeneralNameDER(validName))})
 		}, nil},
+		{"valid PrintableString", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x13, 0x01, 'A'}})), nil},
+		{"valid TeletexString", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x14, 0x01, 'A'}})), nil},
+		{"valid UTF8String", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x0c, 0x02, 0xc3, 0xa9}})), nil},
+		{"valid UniversalString", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x1c, 0x04, 0x00, 0x00, 0x00, 'A'}})), nil},
+		{"valid BMPString", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x1e, 0x02, 0x00, 'A'}})), nil},
+		{"O INTEGER rejected", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDOrganizationName, RawValue: []byte{0x02, 0x01, 0x01}})), []string{"e_cqrp_subscriber_ian_form"}},
+		{"CN NULL rejected", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x05, 0x00}})), []string{"e_cqrp_subscriber_ian_form"}},
+		{"empty O rejected", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDOrganizationName, RawValue: []byte{0x0c, 0x00}})), []string{"e_cqrp_subscriber_ian_form"}},
+		{"O over 64 characters rejected", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDOrganizationName, RawValue: longUTF8})), []string{"e_cqrp_subscriber_ian_form"}},
+		{"malformed CN unicode rejected", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x0c, 0x01, 0xff}})), []string{"e_cqrp_subscriber_ian_form"}},
 		{"critical", func(x *mtctest.Template) {
 			x.Extensions = append(x.Extensions, mtctest.Extension{ID: mtctest.OIDIssuerAltName, Critical: true, Value: mtctest.GeneralNamesDER(mtctest.DirectoryNameGeneralNameDER(validName))})
 		}, []string{"e_cqrp_subscriber_ian_critical"}},
@@ -239,9 +337,18 @@ func TestCQRP020SubscriberIANAndSCT(t *testing.T) {
 			name := mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCountryName, Value: "US"})
 			x.Extensions = append(x.Extensions, mtctest.Extension{ID: mtctest.OIDIssuerAltName, Value: mtctest.GeneralNamesDER(mtctest.DirectoryNameGeneralNameDER(name), []byte{0x82, 0x01, 'x'})})
 		}, []string{"e_cqrp_subscriber_ian_form"}},
-		{"duplicate IAN deferred", func(x *mtctest.Template) {
-			x.Extensions = append(x.Extensions, mtctest.Extension{ID: mtctest.OIDIssuerAltName, Critical: true, Value: []byte{0x30, 0x00}}, mtctest.Extension{ID: mtctest.OIDIssuerAltName, Value: mtctest.GeneralNamesDER(mtctest.DirectoryNameGeneralNameDER(validName))})
-		}, nil},
+		{"duplicate IAN valid then critical malformed", func(x *mtctest.Template) {
+			x.Extensions = append(x.Extensions,
+				mtctest.Extension{ID: mtctest.OIDIssuerAltName, Value: mtctest.GeneralNamesDER(mtctest.DirectoryNameGeneralNameDER(validName))},
+				mtctest.Extension{ID: mtctest.OIDIssuerAltName, Critical: true, Value: []byte{0x30, 0x00}},
+			)
+		}, []string{"e_cqrp_subscriber_ian_critical", "e_cqrp_subscriber_ian_form"}},
+		{"duplicate IAN critical malformed then valid", func(x *mtctest.Template) {
+			x.Extensions = append(x.Extensions,
+				mtctest.Extension{ID: mtctest.OIDIssuerAltName, Critical: true, Value: []byte{0x30, 0x00}},
+				mtctest.Extension{ID: mtctest.OIDIssuerAltName, Value: mtctest.GeneralNamesDER(mtctest.DirectoryNameGeneralNameDER(validName))},
+			)
+		}, []string{"e_cqrp_subscriber_ian_critical", "e_cqrp_subscriber_ian_form"}},
 		{"SCT present", func(x *mtctest.Template) {
 			x.Extensions = append(x.Extensions, mtctest.Extension{ID: mtctest.OIDSCTList, Value: []byte{0x00}})
 		}, []string{"e_cqrp_subscriber_sct_present"}},
@@ -251,6 +358,15 @@ func TestCQRP020SubscriberIANAndSCT(t *testing.T) {
 			tpl := mtctest.ValidCQRPSubscriberTemplate()
 			tc.mutate(&tpl)
 			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
+		})
+	}
+}
+
+func addIANName(name []byte) func(*mtctest.Template) {
+	return func(tpl *mtctest.Template) {
+		tpl.Extensions = append(tpl.Extensions, mtctest.Extension{
+			ID:    mtctest.OIDIssuerAltName,
+			Value: mtctest.GeneralNamesDER(mtctest.DirectoryNameGeneralNameDER(name)),
 		})
 	}
 }

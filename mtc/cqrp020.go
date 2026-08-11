@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/asn1"
 	"time"
+	"unicode/utf8"
 )
 
 const cqrp020Source = "CQRP v0.2.0"
@@ -41,7 +42,7 @@ var cqrp020Rules = []Rule{
 	}),
 	cqrp020Rule("e_cqrp_ca_spki_encoding", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		algorithm := a.SubjectPublicKey.Algorithm
-		if algorithm.Algorithm.Equal(OIDMLDSA44) && !bytes.Equal(algorithm.Raw, mlDSA44AlgorithmDER) {
+		if algorithm.Algorithm.Equal(OIDMLDSA44) && (!bytes.Equal(algorithm.Raw, mlDSA44AlgorithmDER) || !validMLDSAPublicKey(a.SubjectPublicKey, 1312)) {
 			return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "ML-DSA-44 AlgorithmIdentifier does not have the required encoding")
 		}
 		return nil
@@ -54,8 +55,10 @@ var cqrp020Rules = []Rule{
 	}),
 	cqrp020Rule("e_cqrp_ca_key_usage_not_critical", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidKeyUsage)
-		if len(extensions) == 1 && !extensions[0].Critical {
-			return errorFinding("tbsCertificate.extensions.keyUsage", "CA key usage extension is not critical")
+		for _, extension := range extensions {
+			if !extension.Critical {
+				return errorFinding("tbsCertificate.extensions.keyUsage", "CA key usage extension is not critical")
+			}
 		}
 		return nil
 	}),
@@ -74,7 +77,7 @@ var cqrp020Rules = []Rule{
 	}),
 	cqrp020Rule("e_cqrp_subscriber_mldsa_encoding", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		algorithm := a.SubjectPublicKey.Algorithm
-		if expected := expectedMLDSAAlgorithmDER(algorithm.Algorithm); expected != nil && !bytes.Equal(algorithm.Raw, expected) {
+		if expected, keySize := expectedMLDSAEncoding(algorithm.Algorithm); expected != nil && (!bytes.Equal(algorithm.Raw, expected) || !validMLDSAPublicKey(a.SubjectPublicKey, keySize)) {
 			return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "ML-DSA AlgorithmIdentifier does not have the required encoding")
 		}
 		return nil
@@ -100,12 +103,15 @@ var cqrp020Rules = []Rule{
 	}),
 	cqrp020Rule("e_cqrp_subscriber_policies_critical", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidCertificatePolicies)
-		if len(extensions) == 1 && extensions[0].Critical {
+		if anyCritical(extensions) {
 			return errorFinding("tbsCertificate.extensions.certificatePolicies", "certificate policies extension is critical")
 		}
 		return nil
 	}),
 	cqrp020Rule("e_cqrp_subscriber_policy_identifier", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+		if countExtensions(a, oidCertificatePolicies) > 1 {
+			return errorFinding("tbsCertificate.extensions.certificatePolicies", "certificate policies extension is duplicated")
+		}
 		policies, ok := subscriberPolicies(a)
 		if !ok && countExtensions(a, oidCertificatePolicies) == 1 {
 			return errorFinding("tbsCertificate.extensions.certificatePolicies", "certificate policies does not contain only valid reserved policy identifiers")
@@ -118,14 +124,11 @@ var cqrp020Rules = []Rule{
 		return nil
 	}),
 	cqrp020Rule("w_cqrp_subscriber_policy_not_dv", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
-		policies, ok := subscriberPolicies(a)
+		policies, ok := allowedSubscriberPolicies(a)
 		if !ok {
 			return nil
 		}
 		for _, policy := range policies {
-			if !isAllowedSubscriberPolicy(policy) {
-				return nil
-			}
 			if !policy.Equal(oidPolicyDV) {
 				return warningFinding("tbsCertificate.extensions.certificatePolicies", "subscriber certificate asserts a reserved policy other than DV")
 			}
@@ -140,27 +143,30 @@ var cqrp020Rules = []Rule{
 	}),
 	cqrp020Rule("e_cqrp_subscriber_eku_critical", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidExtendedKeyUsage)
-		if len(extensions) == 1 && extensions[0].Critical {
+		if anyCritical(extensions) {
 			return errorFinding("tbsCertificate.extensions.extKeyUsage", "extended key usage extension is critical")
 		}
 		return nil
 	}),
 	cqrp020Rule("e_cqrp_subscriber_eku_only_server_auth", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidExtendedKeyUsage)
-		if len(extensions) == 1 && !isOnlyServerAuthEKU(extensions[0].Value) {
+		if len(extensions) > 1 || len(extensions) == 1 && !isOnlyServerAuthEKU(extensions[0].Value) {
 			return errorFinding("tbsCertificate.extensions.extKeyUsage", "extended key usage is not exactly id-kp-serverAuth")
 		}
 		return nil
 	}),
 	cqrp020Rule("e_cqrp_subscriber_ian_critical", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidIssuerAlternativeName)
-		if len(extensions) == 1 && extensions[0].Critical {
+		if anyCritical(extensions) {
 			return errorFinding("tbsCertificate.extensions.issuerAlternativeName", "issuer alternative name extension is critical")
 		}
 		return nil
 	}),
 	cqrp020Rule("e_cqrp_subscriber_ian_form", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidIssuerAlternativeName)
+		if len(extensions) > 1 {
+			return errorFinding("tbsCertificate.extensions.issuerAlternativeName", "issuer alternative name extension is duplicated")
+		}
 		if len(extensions) == 1 {
 			if _, ok := parseIssuerAlternativeNames(extensions[0].Value); !ok {
 				return errorFinding("tbsCertificate.extensions.issuerAlternativeName", "issuer alternative name is not valid directoryName-only GeneralNames")
@@ -225,17 +231,21 @@ func isHashMLDSA(oid asn1.ObjectIdentifier) bool {
 	return oid.Equal(OIDHashMLDSA44) || oid.Equal(OIDHashMLDSA65) || oid.Equal(OIDHashMLDSA87)
 }
 
-func expectedMLDSAAlgorithmDER(oid asn1.ObjectIdentifier) []byte {
+func expectedMLDSAEncoding(oid asn1.ObjectIdentifier) ([]byte, int) {
 	switch {
 	case oid.Equal(OIDMLDSA44):
-		return mlDSA44AlgorithmDER
+		return mlDSA44AlgorithmDER, 1312
 	case oid.Equal(OIDMLDSA65):
-		return mlDSA65AlgorithmDER
+		return mlDSA65AlgorithmDER, 1952
 	case oid.Equal(OIDMLDSA87):
-		return mlDSA87AlgorithmDER
+		return mlDSA87AlgorithmDER, 2592
 	default:
-		return nil
+		return nil, 0
 	}
+}
+
+func validMLDSAPublicKey(spki SubjectPublicKeyInfo, size int) bool {
+	return spki.UnusedBits == 0 && len(spki.SubjectPublicKey) == size
 }
 
 func subscriberPolicies(artifact *Artifact) ([]asn1.ObjectIdentifier, bool) {
@@ -244,6 +254,28 @@ func subscriberPolicies(artifact *Artifact) ([]asn1.ObjectIdentifier, bool) {
 		return nil, false
 	}
 	return parseCertificatePolicies(extensions[0].Value)
+}
+
+func allowedSubscriberPolicies(artifact *Artifact) ([]asn1.ObjectIdentifier, bool) {
+	policies, ok := subscriberPolicies(artifact)
+	if !ok {
+		return nil, false
+	}
+	for _, policy := range policies {
+		if !isAllowedSubscriberPolicy(policy) {
+			return nil, false
+		}
+	}
+	return policies, true
+}
+
+func anyCritical(extensions []Extension) bool {
+	for _, extension := range extensions {
+		if extension.Critical {
+			return true
+		}
+	}
+	return false
 }
 
 func parseCertificatePolicies(input []byte) ([]asn1.ObjectIdentifier, bool) {
@@ -381,10 +413,15 @@ func parseDirectoryName(input []byte) (bool, bool) {
 			if err != nil {
 				return false, false
 			}
-			if _, err := takeDER(&contents, "attribute value"); err != nil || len(contents) != 0 {
+			value, err := takeDER(&contents, "attribute value")
+			if err != nil || len(contents) != 0 {
 				return false, false
 			}
-			if !typeOID.Equal(oidOrganizationName) && !typeOID.Equal(oidCommonName) {
+			if typeOID.Equal(oidOrganizationName) || typeOID.Equal(oidCommonName) {
+				if !validDirectoryString(value) {
+					return false, false
+				}
+			} else {
 				otherAttributes = true
 			}
 			attributes = attributeRest
@@ -392,4 +429,27 @@ func parseDirectoryName(input []byte) (bool, bool) {
 		rdns = rest
 	}
 	return otherAttributes, true
+}
+
+func validDirectoryString(value derValue) bool {
+	if value.class != classUniversal || value.constructed {
+		return false
+	}
+	characters := 0
+	switch value.tag {
+	case asn1.TagT61String, asn1.TagPrintableString:
+		characters = len(value.contents)
+	case asn1.TagUTF8String:
+		if !utf8.Valid(value.contents) {
+			return false
+		}
+		characters = utf8.RuneCount(value.contents)
+	case tagUniversalString:
+		characters = len(value.contents) / 4
+	case asn1.TagBMPString:
+		characters = len(value.contents) / 2
+	default:
+		return false
+	}
+	return characters >= 1 && characters <= 64
 }

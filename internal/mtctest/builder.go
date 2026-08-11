@@ -101,7 +101,7 @@ func ValidSubscriberTemplate() Template {
 		NotBefore:        time.Date(2026, 7, 1, 8, 0, 0, 0, time.UTC),
 		NotAfter:         time.Date(2026, 7, 8, 8, 0, 0, 0, time.UTC),
 		SPKIAlgorithm:    Algorithm{OID: OIDMLDSA44},
-		SubjectPublicKey: bytes.Repeat([]byte{0x5a}, 32),
+		SubjectPublicKey: bytes.Repeat([]byte{0x5a}, 1312),
 		Extensions: []Extension{
 			{ID: OIDBasicConstraints, Critical: true, Value: der(0x30, nil)},
 		},
@@ -240,14 +240,19 @@ func ExtendedKeyUsageDER(ids ...asn1.ObjectIdentifier) []byte {
 }
 
 type NameAttribute struct {
-	ID    asn1.ObjectIdentifier
-	Value string
+	ID       asn1.ObjectIdentifier
+	Value    string
+	RawValue []byte
 }
 
 func NameDER(attributes ...NameAttribute) []byte {
 	rdns := make([][]byte, 0, len(attributes))
 	for _, attribute := range attributes {
-		atv := der(0x30, mustMarshal(attribute.ID), mustMarshal(attribute.Value))
+		value := attribute.RawValue
+		if value == nil {
+			value = mustMarshal(attribute.Value)
+		}
+		atv := der(0x30, mustMarshal(attribute.ID), value)
 		rdns = append(rdns, der(0x31, atv))
 	}
 	return der(0x30, rdns...)
