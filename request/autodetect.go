@@ -201,10 +201,14 @@ func (ri *RequestInfo) GetProfile(profileName string) bool {
 			switch ri.mtcArtifact.Kind {
 			case mtc.ArtifactCA:
 				ri.profileId = linter.MTC_CA
+				return true
 			case mtc.ArtifactSubscriber:
 				ri.profileId = linter.MTC_SUBSCRIBER
+				return true
 			}
-			return true
+		}
+		if ri.cert == nil {
+			return false
 		}
 
 		switch ri.endpoint {

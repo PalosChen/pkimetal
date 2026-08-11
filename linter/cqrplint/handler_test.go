@@ -120,6 +120,34 @@ func TestUnsupportedNilAndMissingArtifactAreSafe(t *testing.T) {
 	}
 }
 
+func TestExplicitSubscriberProfileRunsCQRPPolicyForUnknownArtifact(t *testing.T) {
+	tpl := mtctest.ValidCQRPSubscriberTemplate()
+	tpl.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDSHA256}
+	tpl.OuterSignature = tpl.TBSSignature
+	tpl.Issuer = []byte{0x30, 0x00}
+	mtctest.RemoveExtension(&tpl, mtctest.OIDExtendedKeyUsage)
+	artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+	if artifact.Kind != mtc.ArtifactUnknown {
+		t.Fatalf("artifact kind = %v, want unknown", artifact.Kind)
+	}
+
+	results := handle(t, linter.CQRP_MTC_SUBSCRIBER, artifact)
+	assertHasCode(t, results, "e_cqrp_subscriber_eku_missing")
+}
+
+func TestExplicitCAProfileRunsCQRPPolicyForUnknownArtifact(t *testing.T) {
+	tpl := mtctest.ValidCQRPCATemplate()
+	mtctest.RemoveExtension(&tpl, mtctest.OIDMTC_CA)
+	tpl.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA65}
+	artifact := parseArtifact(t, tpl, mtc.InputTBSCertificate)
+	if artifact.Kind != mtc.ArtifactUnknown {
+		t.Fatalf("artifact kind = %v, want unknown", artifact.Kind)
+	}
+
+	results := handle(t, linter.CQRP_MTC_CA, artifact)
+	assertHasCode(t, results, "e_cqrp_ca_spki_algorithm")
+}
+
 func TestTBSSkipsStandaloneCosignaturePolicy(t *testing.T) {
 	tpl := mtctest.ValidCQRPSubscriberTemplate()
 	proof := mtctest.ValidProof()

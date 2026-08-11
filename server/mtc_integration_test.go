@@ -66,6 +66,7 @@ func TestMTCCertificateEndpoints(t *testing.T) {
 	t.Run("method and path routing", func(t *testing.T) { testMTCMethodAndPathRouting(t, h) })
 	t.Run("malformed proof", func(t *testing.T) { testMTCMalformedProof(t, h) })
 	t.Run("profile mismatch", func(t *testing.T) { testMTCProfileMismatch(t, h) })
+	t.Run("explicit unknown artifacts", func(t *testing.T) { testMTCExplicitUnknownArtifacts(t, h) })
 	t.Run("TBS exclusions", func(t *testing.T) { testMTCTBSExclusions(t, h) })
 	t.Run("JSON schema", func(t *testing.T) { testMTCJSONSchema(t, h) })
 }
@@ -455,6 +456,46 @@ func testMTCProfileMismatch(t *testing.T, h *mtcHTTPTestServer) {
 			assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
 			assertFinding(t, response.results, "mtclint", "e_mtc_profile_artifact_mismatch", "error")
 			assertFindingExact(t, response.results, "mtclint", "e_mtc_profile_artifact_mismatch", tc.wantFinding)
+		})
+	}
+}
+
+func testMTCExplicitUnknownArtifacts(t *testing.T, h *mtcHTTPTestServer) {
+	subscriber := mtctest.ValidCQRPSubscriberTemplate()
+	subscriber.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDSHA256}
+	subscriber.OuterSignature = subscriber.TBSSignature
+	subscriber.Issuer = []byte{0x30, 0x00}
+	mtctest.RemoveExtension(&subscriber, mtctest.OIDExtendedKeyUsage)
+
+	ca := mtctest.ValidCQRPCATemplate()
+	mtctest.RemoveExtension(&ca, mtctest.OIDMTC_CA)
+	ca.Subject = []byte{0x30, 0x00}
+	ca.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA65}
+
+	for _, tc := range []struct {
+		name        string
+		path        string
+		profile     string
+		contentType string
+		input       []byte
+		want        []struct{ linter, code string }
+	}{
+		{"certificate MTC subscriber", "/lintcert", "mtc_subscriber", "application/pkix-cert", mtctest.Certificate(subscriber), []struct{ linter, code string }{{"mtclint", "e_mtc_signature_algorithm_oid"}, {"mtclint", "e_mtc_subscriber_issuer_not_ca_id"}}},
+		{"TBS MTC subscriber", "/linttbscert", "mtc_subscriber", "application/octet-stream", mtctest.TBSCertificate(subscriber), []struct{ linter, code string }{{"mtclint", "e_mtc_signature_algorithm_oid"}, {"mtclint", "e_mtc_subscriber_issuer_not_ca_id"}}},
+		{"certificate CQRP subscriber", "/lintcert", "cqrp_mtc_subscriber", "application/pkix-cert", mtctest.Certificate(subscriber), []struct{ linter, code string }{{"mtclint", "e_mtc_signature_algorithm_oid"}, {"cqrplint", "e_cqrp_subscriber_eku_missing"}}},
+		{"TBS CQRP subscriber", "/linttbscert", "cqrp_mtc_subscriber", "application/octet-stream", mtctest.TBSCertificate(subscriber), []struct{ linter, code string }{{"mtclint", "e_mtc_signature_algorithm_oid"}, {"cqrplint", "e_cqrp_subscriber_eku_missing"}}},
+		{"certificate MTC CA", "/lintcert", "mtc_ca", "application/pkix-cert", mtctest.Certificate(ca), []struct{ linter, code string }{{"mtclint", "e_mtc_ca_subject_not_ca_id"}, {"mtclint", "e_mtc_ca_extension_missing"}}},
+		{"TBS MTC CA", "/linttbscert", "mtc_ca", "application/octet-stream", mtctest.TBSCertificate(ca), []struct{ linter, code string }{{"mtclint", "e_mtc_ca_subject_not_ca_id"}, {"mtclint", "e_mtc_ca_extension_missing"}}},
+		{"certificate CQRP CA", "/lintcert", "cqrp_mtc_ca", "application/pkix-cert", mtctest.Certificate(ca), []struct{ linter, code string }{{"mtclint", "e_mtc_ca_extension_missing"}, {"cqrplint", "e_cqrp_ca_spki_algorithm"}}},
+		{"TBS CQRP CA", "/linttbscert", "cqrp_mtc_ca", "application/octet-stream", mtctest.TBSCertificate(ca), []struct{ linter, code string }{{"mtclint", "e_mtc_ca_extension_missing"}, {"cqrplint", "e_cqrp_ca_spki_algorithm"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			response := h.postJSON(t, mtcHTTPRequest{path: tc.path, profile: tc.profile, contentType: tc.contentType, body: tc.input})
+			assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+			assertFinding(t, response.results, "mtclint", "e_mtc_profile_artifact_mismatch", "error")
+			for _, finding := range tc.want {
+				assertFinding(t, response.results, finding.linter, finding.code, "error")
+			}
 		})
 	}
 }

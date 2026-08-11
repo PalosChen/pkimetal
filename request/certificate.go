@@ -57,7 +57,7 @@ func (ri *RequestInfo) parseCertificateInput() (cert *x509.Certificate, err erro
 
 func parseCertificateBytes(decoded []byte, inputKind mtc.InputKind, parseLegacy func([]byte) (*x509.Certificate, error)) (processed []byte, cert *x509.Certificate, artifact *mtc.Artifact, err error) {
 	artifact, mtcErr := mtc.Parse(decoded, inputKind)
-	if mtcErr == nil && (artifact.Kind == mtc.ArtifactCA || artifact.Kind == mtc.ArtifactSubscriber) {
+	if mtcErr == nil {
 		legacyInput := append([]byte(nil), decoded...)
 		if inputKind == mtc.InputTBSCertificate {
 			if legacyInput, err = makeDummyCertificateBytes(decoded); err != nil {

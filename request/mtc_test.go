@@ -177,11 +177,8 @@ func TestParseCertificateBytesRetainsMalformedSubscriberProof(t *testing.T) {
 	}
 }
 
-func TestParseCertificateBytesUnknownUsesLegacyParser(t *testing.T) {
-	tpl := mtctest.ValidSubscriberTemplate()
-	tpl.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDSHA256}
-	tpl.OuterSignature = tpl.TBSSignature
-	tpl.Issuer = []byte{0x30, 0x00}
+func TestParseCertificateBytesUnknownRetainsNativeAndLegacyParses(t *testing.T) {
+	tpl := unknownNativeSubscriberTemplate()
 	decoded := mtctest.Certificate(tpl)
 	wantCert := &x509.Certificate{}
 	calls := 0
@@ -196,8 +193,34 @@ func TestParseCertificateBytesUnknownUsesLegacyParser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseCertificateBytes() error = %v", err)
 	}
-	if calls != 1 || cert != wantCert || artifact != nil || !bytes.Equal(processed, decoded) {
+	if calls != 1 || cert != wantCert || artifact == nil || artifact.Kind != mtc.ArtifactUnknown || !bytes.Equal(processed, decoded) {
 		t.Fatalf("calls/certificate/artifact = %d/%#v/%#v", calls, cert, artifact)
+	}
+}
+
+func TestParseCertificateBytesUnknownRetainsNativeWhenLegacyFails(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		inputKind mtc.InputKind
+		decoded   []byte
+	}{
+		{"certificate", mtc.InputCertificate, mtctest.Certificate(unknownNativeSubscriberTemplate())},
+		{"TBS certificate", mtc.InputTBSCertificate, mtctest.TBSCertificate(unknownNativeSubscriberTemplate())},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			processed, cert, artifact, err := parseCertificateBytes(tc.decoded, tc.inputKind, func([]byte) (*x509.Certificate, error) {
+				return nil, errors.New("unsupported native algorithm")
+			})
+			if err != nil {
+				t.Fatalf("parseCertificateBytes() error = %v", err)
+			}
+			if cert != nil || artifact == nil || artifact.Kind != mtc.ArtifactUnknown {
+				t.Fatalf("certificate/artifact = %#v/%#v", cert, artifact)
+			}
+			if !bytes.Equal(processed, tc.decoded) {
+				t.Fatal("unknown native input was modified")
+			}
+		})
 	}
 }
 
@@ -219,10 +242,8 @@ func TestParseCertificateBytesLegacyErrorAndPanic(t *testing.T) {
 	}
 }
 
-func TestParseCertificateBytesUnknownTBSUsesLegacyDummyCertificate(t *testing.T) {
-	tpl := mtctest.ValidSubscriberTemplate()
-	tpl.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDSHA256}
-	tpl.Issuer = []byte{0x30, 0x00}
+func TestParseCertificateBytesUnknownTBSRetainsNativeBytesAndLegacyCertificate(t *testing.T) {
+	tpl := unknownNativeSubscriberTemplate()
 	decoded := mtctest.TBSCertificate(tpl)
 	wantCert := &x509.Certificate{}
 
@@ -235,7 +256,7 @@ func TestParseCertificateBytesUnknownTBSUsesLegacyDummyCertificate(t *testing.T)
 	if err != nil {
 		t.Fatalf("parseCertificateBytes() error = %v", err)
 	}
-	if cert != wantCert || artifact != nil || bytes.Equal(processed, decoded) {
+	if cert != wantCert || artifact == nil || artifact.Kind != mtc.ArtifactUnknown || !bytes.Equal(processed, decoded) {
 		t.Fatalf("certificate/artifact/processed = %#v/%#v/%x", cert, artifact, processed)
 	}
 }
@@ -285,6 +306,38 @@ func TestMTCRequestParsingAndProfileSelection(t *testing.T) {
 	}
 }
 
+func TestExplicitMTCProfilesRetainUnknownNativeCertificateAndTBS(t *testing.T) {
+	tpl := unknownNativeSubscriberTemplate()
+	for _, tc := range []struct {
+		name     string
+		endpoint Endpoint
+		decoded  []byte
+	}{
+		{"certificate", ENDPOINT_LINTCERT, mtctest.Certificate(tpl)},
+		{"TBS certificate", ENDPOINT_LINTTBSCERT, mtctest.TBSCertificate(tpl)},
+	} {
+		for _, profile := range []string{"mtc_ca", "mtc_subscriber", "cqrp_mtc_ca", "cqrp_mtc_subscriber"} {
+			t.Run(tc.name+"/"+profile, func(t *testing.T) {
+				ri := RequestInfo{
+					endpoint: tc.endpoint,
+					b64Input: []byte(base64.StdEncoding.EncodeToString(tc.decoded)),
+				}
+				var err error
+				ri.cert, err = ri.parseCertificateInput()
+				if err != nil {
+					t.Fatalf("parseCertificateInput() error = %v", err)
+				}
+				if ri.mtcArtifact == nil || ri.mtcArtifact.Kind != mtc.ArtifactUnknown {
+					t.Fatalf("MTC artifact = %#v, want unknown", ri.mtcArtifact)
+				}
+				if !ri.GetProfile(profile) || linter.AllProfiles[ri.profileId].Name != profile {
+					t.Fatalf("profile = %v, want %s", ri.profileId, profile)
+				}
+			})
+		}
+	}
+}
+
 func TestAllExplicitMTCProfileNamesAreAccepted(t *testing.T) {
 	for _, name := range []string{"mtc_ca", "mtc_subscriber", "cqrp_mtc_ca", "cqrp_mtc_subscriber"} {
 		ri := RequestInfo{}
@@ -320,12 +373,21 @@ func TestOrdinaryCertificateStillUsesLegacyParsingAndAutodetection(t *testing.T)
 	if err != nil {
 		t.Fatalf("parseCertificateInput() error = %v", err)
 	}
-	if ri.cert == nil || ri.mtcArtifact != nil {
+	if ri.cert == nil || ri.mtcArtifact == nil || ri.mtcArtifact.Kind != mtc.ArtifactUnknown {
 		t.Fatalf("legacy certificate/MTC artifact = %#v/%#v", ri.cert, ri.mtcArtifact)
 	}
 	if !ri.GetProfile("autodetect") || ri.profileId != linter.RFC5280_ROOT {
 		t.Fatalf("profile = %v, want %v", ri.profileId, linter.RFC5280_ROOT)
 	}
+}
+
+func unknownNativeSubscriberTemplate() mtctest.Template {
+	tpl := mtctest.ValidCQRPSubscriberTemplate()
+	tpl.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDSHA256}
+	tpl.OuterSignature = tpl.TBSSignature
+	tpl.Issuer = []byte{0x30, 0x00}
+	mtctest.RemoveExtension(&tpl, mtctest.OIDMTC_CA)
+	return tpl
 }
 
 func TestMalformedMTCProofPOSTSucceedsAndDispatchesArtifact(t *testing.T) {

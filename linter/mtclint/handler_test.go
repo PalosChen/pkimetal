@@ -158,6 +158,37 @@ func TestNilAndUnknownArtifactsReportMismatchWithoutPanicking(t *testing.T) {
 	}
 }
 
+func TestExplicitSubscriberProfileRunsDraftRulesForUnknownArtifact(t *testing.T) {
+	tpl := mtctest.ValidSubscriberTemplate()
+	tpl.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDSHA256}
+	tpl.OuterSignature = tpl.TBSSignature
+	tpl.Issuer = []byte{0x30, 0x00}
+	artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+	if artifact.Kind != mtc.ArtifactUnknown {
+		t.Fatalf("artifact kind = %v, want unknown", artifact.Kind)
+	}
+
+	results := handle(t, linter.MTC_SUBSCRIBER, artifact)
+	assertHasCode(t, results, "e_mtc_profile_artifact_mismatch")
+	assertHasCode(t, results, "e_mtc_signature_algorithm_oid")
+	assertHasCode(t, results, "e_mtc_subscriber_issuer_not_ca_id")
+}
+
+func TestExplicitCAProfileRunsDraftRulesForUnknownArtifact(t *testing.T) {
+	tpl := mtctest.ValidCATemplate()
+	mtctest.RemoveExtension(&tpl, mtctest.OIDMTC_CA)
+	tpl.Subject = []byte{0x30, 0x00}
+	artifact := parseArtifact(t, tpl, mtc.InputTBSCertificate)
+	if artifact.Kind != mtc.ArtifactUnknown {
+		t.Fatalf("artifact kind = %v, want unknown", artifact.Kind)
+	}
+
+	results := handle(t, linter.MTC_CA, artifact)
+	assertHasCode(t, results, "e_mtc_profile_artifact_mismatch")
+	assertHasCode(t, results, "e_mtc_ca_subject_not_ca_id")
+	assertHasCode(t, results, "e_mtc_ca_extension_missing")
+}
+
 func TestTBSSkipsOuterSignatureAndProofRules(t *testing.T) {
 	tpl := mtctest.ValidSubscriberTemplate()
 	tpl.OuterSignature.OID = mtctest.OIDSHA256
