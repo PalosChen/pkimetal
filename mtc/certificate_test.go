@@ -212,6 +212,45 @@ func TestParseMalformedCAExtensionRemainsLintable(t *testing.T) {
 	}
 }
 
+func TestParseRetainsArtifactTypeConflictWhileClassifyingCA(t *testing.T) {
+	tpl := mtctest.ValidCATemplate()
+	tpl.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDMTCProof}
+	tpl.OuterSignature = tpl.TBSSignature
+	tpl.Signature = mtctest.ProofBytes(mtctest.ValidProof())
+
+	for _, inputKind := range []mtc.InputKind{mtc.InputCertificate, mtc.InputTBSCertificate} {
+		input := mtctest.Certificate(tpl)
+		if inputKind == mtc.InputTBSCertificate {
+			input = mtctest.TBSCertificate(tpl)
+		}
+		got, err := mtc.Parse(input, inputKind)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Kind != mtc.ArtifactCA {
+			t.Fatalf("input kind %v: kind = %v, want CA", inputKind, got.Kind)
+		}
+		if !got.TypeConflict {
+			t.Fatalf("input kind %v: type conflict was not retained", inputKind)
+		}
+		if got.Proof != nil || got.ProofParseError != nil {
+			t.Fatalf("input kind %v: autodetected CA proof state = %#v/%v", inputKind, got.Proof, got.ProofParseError)
+		}
+	}
+}
+
+func TestParseOrdinaryArtifactsDoNotHaveTypeConflict(t *testing.T) {
+	for _, tpl := range []mtctest.Template{mtctest.ValidCATemplate(), mtctest.ValidSubscriberTemplate()} {
+		got, err := mtc.Parse(mtctest.Certificate(tpl), mtc.InputCertificate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.TypeConflict {
+			t.Fatalf("ordinary artifact kind %v has a type conflict", got.Kind)
+		}
+	}
+}
+
 func TestParseDuplicateMTCCAExtensionsRemainLintable(t *testing.T) {
 	valid := mtctest.ValidCAExtensionDER()
 	malformed := []byte{0x30, 0x80, 0x00, 0x00}

@@ -134,6 +134,34 @@ func TestExpectedProfileKindControlsRulesAndReportsMismatch(t *testing.T) {
 	}
 }
 
+func TestArtifactTypeConflictIsReportedExactlyOnceForEitherExplicitProfile(t *testing.T) {
+	tpl := mtctest.ValidCATemplate()
+	tpl.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDMTCProof}
+	tpl.OuterSignature = tpl.TBSSignature
+	tpl.Issuer = mtctest.ValidCAIDNameDER()
+	tpl.Serial.SetUint64((1 << 48) | 7)
+	tpl.Signature = mtctest.ProofBytes(mtctest.ValidProof())
+	artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+
+	for _, profile := range []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER} {
+		results := handle(t, profile, artifact)
+		count := 0
+		for _, result := range results {
+			if result.Code == "e_mtc_artifact_type_conflict" {
+				count++
+				if result.Field != "tbsCertificate.signature,tbsCertificate.extensions.mtcCertificationAuthority" ||
+					result.Severity != linter.SEVERITY_ERROR ||
+					result.Finding != "[draft-ietf-plants-merkle-tree-certs-05 §5.5 and 6.2] Artifact matches both MTC CA and subscriber syntax" {
+					t.Errorf("profile %v: conflict finding = %#v", profile, result)
+				}
+			}
+		}
+		if count != 1 {
+			t.Fatalf("profile %v: conflict count = %d, results = %#v", profile, count, results)
+		}
+	}
+}
+
 func TestNilAndUnknownArtifactsReportMismatchWithoutPanicking(t *testing.T) {
 	want := linter.LintingResult{
 		Finding:  "[pkimetal profile dispatch §Explicit MTC profile selection] Selected profile \"mtc_ca\" expects ca artifact; actual artifact kind is unrecognized",

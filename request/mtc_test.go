@@ -262,20 +262,25 @@ func TestParseCertificateBytesUnknownTBSRetainsNativeBytesAndLegacyCertificate(t
 }
 
 func TestMTCRequestParsingAndProfileSelection(t *testing.T) {
+	conflict := mtctest.ValidCATemplate()
+	conflict.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDMTCProof}
+	conflict.OuterSignature = conflict.TBSSignature
 	tests := []struct {
-		name        string
-		endpoint    Endpoint
-		decoded     []byte
-		profileName string
-		wantProfile linter.ProfileId
-		wantKind    mtc.ArtifactKind
+		name         string
+		endpoint     Endpoint
+		decoded      []byte
+		profileName  string
+		wantProfile  linter.ProfileId
+		wantKind     mtc.ArtifactKind
+		wantConflict bool
 	}{
-		{"auto CA", ENDPOINT_LINTCERT, mtctest.Certificate(mtctest.ValidCATemplate()), "", linter.MTC_CA, mtc.ArtifactCA},
-		{"auto subscriber", ENDPOINT_LINTCERT, mtctest.Certificate(mtctest.ValidSubscriberTemplate()), "autodetect", linter.MTC_SUBSCRIBER, mtc.ArtifactSubscriber},
-		{"auto CQRP fixture remains draft", ENDPOINT_LINTCERT, mtctest.Certificate(mtctest.ValidCQRPSubscriberTemplate()), "autodetect", linter.MTC_SUBSCRIBER, mtc.ArtifactSubscriber},
-		{"auto TBS subscriber", ENDPOINT_LINTTBSCERT, mtctest.TBSCertificate(mtctest.ValidSubscriberTemplate()), "", linter.MTC_SUBSCRIBER, mtc.ArtifactSubscriber},
-		{"explicit CQRP retained", ENDPOINT_LINTCERT, mtctest.Certificate(mtctest.ValidCQRPSubscriberTemplate()), "cqrp_mtc_subscriber", linter.CQRP_MTC_SUBSCRIBER, mtc.ArtifactSubscriber},
-		{"explicit mismatch retained", ENDPOINT_LINTCERT, mtctest.Certificate(mtctest.ValidCATemplate()), "mtc_subscriber", linter.MTC_SUBSCRIBER, mtc.ArtifactCA},
+		{"auto CA", ENDPOINT_LINTCERT, mtctest.Certificate(mtctest.ValidCATemplate()), "", linter.MTC_CA, mtc.ArtifactCA, false},
+		{"auto type conflict remains CA", ENDPOINT_LINTCERT, mtctest.Certificate(conflict), "autodetect", linter.MTC_CA, mtc.ArtifactCA, true},
+		{"auto subscriber", ENDPOINT_LINTCERT, mtctest.Certificate(mtctest.ValidSubscriberTemplate()), "autodetect", linter.MTC_SUBSCRIBER, mtc.ArtifactSubscriber, false},
+		{"auto CQRP fixture remains draft", ENDPOINT_LINTCERT, mtctest.Certificate(mtctest.ValidCQRPSubscriberTemplate()), "autodetect", linter.MTC_SUBSCRIBER, mtc.ArtifactSubscriber, false},
+		{"auto TBS subscriber", ENDPOINT_LINTTBSCERT, mtctest.TBSCertificate(mtctest.ValidSubscriberTemplate()), "", linter.MTC_SUBSCRIBER, mtc.ArtifactSubscriber, false},
+		{"explicit CQRP retained", ENDPOINT_LINTCERT, mtctest.Certificate(mtctest.ValidCQRPSubscriberTemplate()), "cqrp_mtc_subscriber", linter.CQRP_MTC_SUBSCRIBER, mtc.ArtifactSubscriber, false},
+		{"explicit mismatch retained", ENDPOINT_LINTCERT, mtctest.Certificate(mtctest.ValidCATemplate()), "mtc_subscriber", linter.MTC_SUBSCRIBER, mtc.ArtifactCA, false},
 	}
 
 	for _, tc := range tests {
@@ -291,6 +296,9 @@ func TestMTCRequestParsingAndProfileSelection(t *testing.T) {
 			ri.cert = cert
 			if ri.mtcArtifact == nil || ri.mtcArtifact.Kind != tc.wantKind {
 				t.Fatalf("MTC artifact = %#v, want kind %v", ri.mtcArtifact, tc.wantKind)
+			}
+			if ri.mtcArtifact.TypeConflict != tc.wantConflict {
+				t.Fatalf("type conflict = %t, want %t", ri.mtcArtifact.TypeConflict, tc.wantConflict)
 			}
 			if !ri.GetProfile(tc.profileName) || ri.profileId != tc.wantProfile {
 				t.Fatalf("profile = %v, want %v", ri.profileId, tc.wantProfile)

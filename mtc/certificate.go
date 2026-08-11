@@ -347,6 +347,7 @@ func classifyArtifact(artifact *Artifact) {
 		caExtensionCount++
 		caExtensionValue = extension.Value
 	}
+	artifact.TypeConflict = caExtensionCount != 0 && artifact.TBSSignature.Algorithm.Equal(OIDMTCProof)
 	if caExtensionCount != 0 {
 		artifact.Kind = ArtifactCA
 		if caExtensionCount == 1 {

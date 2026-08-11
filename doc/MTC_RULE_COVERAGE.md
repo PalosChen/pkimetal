@@ -20,7 +20,9 @@ Omitting `profile`, or selecting `autodetect`, may select `mtc_ca` or
 because CQRP is an explicit policy assertion rather than an encoding property.
 Selecting a CA profile for a subscriber artifact, or the reverse, produces the
 profile/artifact mismatch finding while still evaluating the explicitly chosen
-profile.
+profile. An artifact containing both the MTC CA extension and the
+`id-alg-mtcProof` TBSCertificate signature algorithm remains classified as a CA
+for lintability and produces a separate type-conflict finding.
 
 ## Applicability and limits
 
@@ -60,6 +62,7 @@ baseline remains the user-supplied local draft described above.
 
 | Code | Source | Section | Artifact / profile | Input applicability | Field(s) | Severity | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| `e_mtc_artifact_type_conflict` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 and 6.2 | CA or subscriber / all four MTC profiles | Certificate and TBS | tbsCertificate.signature,tbsCertificate.extensions.mtcCertificationAuthority | error | implemented |
 | `e_mtc_ca_basic_constraints_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.basicConstraints | error | implemented |
 | `e_mtc_ca_basic_constraints_not_ca` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.basicConstraints | error | implemented |
 | `e_mtc_ca_extension_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions | error | implemented |

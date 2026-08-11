@@ -23,6 +23,7 @@ type findingExpectation struct {
 }
 
 var draft05Expectations = map[string]findingExpectation{
+	"e_mtc_artifact_type_conflict":                        {"e_mtc_artifact_type_conflict", Error, "tbsCertificate.signature,tbsCertificate.extensions.mtcCertificationAuthority", "draft-ietf-plants-merkle-tree-certs-05", "5.5 and 6.2"},
 	"signature_algorithm_oid_inner":                       {"e_mtc_signature_algorithm_oid", Error, "tbsCertificate.signature", "draft-ietf-plants-merkle-tree-certs-05", "6.2"},
 	"signature_algorithm_oid_outer":                       {"e_mtc_signature_algorithm_oid", Error, "signatureAlgorithm", "draft-ietf-plants-merkle-tree-certs-05", "6.2"},
 	"signature_algorithm_parameters_present_inner":        {"e_mtc_signature_algorithm_parameters_present", Error, "tbsCertificate.signature.parameters", "draft-ietf-plants-merkle-tree-certs-05", "6.2"},
@@ -125,6 +126,9 @@ func expectedCoverageRecords(t *testing.T) map[string]coverageRecord {
 				if cqrp {
 					artifactProfile = "CA / CQRP CA"
 				}
+			}
+			if reflect.DeepEqual(rule.Kinds, bothArtifactKinds) {
+				artifactProfile = "CA or subscriber / all four MTC profiles"
 			}
 			if strings.HasPrefix(rule.Code, "e_rfc9925_") || strings.HasPrefix(rule.Code, "w_rfc9925_") {
 				artifactProfile = "Unsigned CA / MTC and CQRP CA"
@@ -664,12 +668,12 @@ func TestLintDraft05ForKindRebuildsSubscriberProofState(t *testing.T) {
 		{
 			name:     "CA with valid proof",
 			template: explicitCASubscriberTemplate(validProof),
-			want:     nil,
+			want:     []string{"e_mtc_artifact_type_conflict"},
 		},
 		{
 			name:     "CA with malformed proof",
 			template: explicitCASubscriberTemplate(mtctest.MalformedProofBytes()),
-			want:     []string{"f_mtc_proof_malformed"},
+			want:     []string{"e_mtc_artifact_type_conflict", "f_mtc_proof_malformed"},
 		},
 	}
 	for _, tc := range tests {
@@ -688,14 +692,34 @@ func TestLintDraft05ForKindRunsSubscriberProofSemanticRules(t *testing.T) {
 	tpl := explicitCASubscriberTemplate(mtctest.ProofBytes(mtctest.Proof{Start: 4, End: 9}))
 	artifact := parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)
 	findings := lintForKindWithoutMutation(t, artifact, ArtifactSubscriber)
-	assertFindings(t, findings, "e_mtc_proof_subtree_invalid")
+	assertFindings(t, findings, "e_mtc_artifact_type_conflict", "e_mtc_proof_subtree_invalid")
 }
 
 func TestLintDraft05ForKindDoesNotParseProofForTBS(t *testing.T) {
 	tpl := explicitCASubscriberTemplate(mtctest.MalformedProofBytes())
 	artifact := parseArtifact(t, mtctest.TBSCertificate(tpl), InputTBSCertificate)
 	findings := lintForKindWithoutMutation(t, artifact, ArtifactSubscriber)
-	assertFindings(t, findings)
+	assertFindings(t, findings, "e_mtc_artifact_type_conflict")
+}
+
+func TestDraft05ArtifactTypeConflictAppliesExactlyOnceInBothProfileContexts(t *testing.T) {
+	tpl := explicitCASubscriberTemplate(mtctest.ProofBytes(mtctest.ValidProof()))
+	artifact := parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)
+	if artifact.Kind != ArtifactCA || !artifact.TypeConflict {
+		t.Fatalf("kind/conflict = %v/%t, want CA/true", artifact.Kind, artifact.TypeConflict)
+	}
+	if artifact.Proof != nil || artifact.ProofParseError != nil {
+		t.Fatalf("autodetected CA proof state = %#v/%v", artifact.Proof, artifact.ProofParseError)
+	}
+
+	for _, expected := range []ArtifactKind{ArtifactCA, ArtifactSubscriber} {
+		findings := lintForKindWithoutMutation(t, artifact, expected)
+		want := []string{"e_mtc_artifact_type_conflict"}
+		if expected == ArtifactCA {
+			want = append(want, "w_mtc_ca_self_issued")
+		}
+		assertFindings(t, findings, want...)
+	}
 }
 
 func TestDraft05CASerialRangeBoundaries(t *testing.T) {

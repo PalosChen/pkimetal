@@ -25,6 +25,12 @@ var (
 )
 
 var draft05Rules = []Rule{
+	draftRule("e_mtc_artifact_type_conflict", "5.5 and 6.2", bothArtifactKinds, bothInputKinds, func(a *Artifact) *Finding {
+		if a.TypeConflict {
+			return errorFinding("tbsCertificate.signature,tbsCertificate.extensions.mtcCertificationAuthority", "Artifact matches both MTC CA and subscriber syntax")
+		}
+		return nil
+	}),
 	draftRule("e_mtc_signature_algorithm_oid", "6.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		if !a.TBSSignature.Algorithm.Equal(OIDMTCProof) {
 			return errorFinding("tbsCertificate.signature", "TBSCertificate signature algorithm is not id-alg-mtcProof")
@@ -289,6 +295,7 @@ var draft05Rules = []Rule{
 var (
 	caKinds               = []ArtifactKind{ArtifactCA}
 	subscriberKinds       = []ArtifactKind{ArtifactSubscriber}
+	bothArtifactKinds     = []ArtifactKind{ArtifactCA, ArtifactSubscriber}
 	bothInputKinds        = []InputKind{InputCertificate, InputTBSCertificate}
 	certificateInputKinds = []InputKind{InputCertificate}
 )
