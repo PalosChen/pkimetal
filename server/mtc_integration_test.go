@@ -61,6 +61,7 @@ func TestMTCCertificateEndpoints(t *testing.T) {
 	t.Run("error matrix", func(t *testing.T) { testMTCErrorMatrix(t, h) })
 	t.Run("invalid endpoint", func(t *testing.T) { testMTCInvalidEndpoint(t, h) })
 	t.Run("success formats", func(t *testing.T) { testMTCSuccessFormats(t, h) })
+	t.Run("empty filtered JSON", func(t *testing.T) { testMTCEmptyFilteredJSON(t, h) })
 	t.Run("method and path routing", func(t *testing.T) { testMTCMethodAndPathRouting(t, h) })
 	t.Run("malformed proof", func(t *testing.T) { testMTCMalformedProof(t, h) })
 	t.Run("profile mismatch", func(t *testing.T) { testMTCProfileMismatch(t, h) })
@@ -378,6 +379,23 @@ func testMTCSuccessFormats(t *testing.T, h *mtcHTTPTestServer) {
 				t.Errorf("%s success response contains fatal/bug result: %s", tc.format, response.body)
 			}
 		})
+	}
+}
+
+func testMTCEmptyFilteredJSON(t *testing.T, h *mtcHTTPTestServer) {
+	response := h.postJSON(t, mtcHTTPRequest{
+		path:        "/lintcert",
+		profile:     "mtc_subscriber",
+		severity:    "fatal",
+		contentType: "application/pkix-cert",
+		body:        mtctest.Certificate(mtctest.ValidSubscriberTemplate()),
+	})
+	assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+	if string(response.body) != "[]" {
+		t.Errorf("filtered JSON body = %q, want []", response.body)
+	}
+	if len(response.results) != 0 {
+		t.Errorf("filtered JSON results = %#v, want empty", response.results)
 	}
 }
 
