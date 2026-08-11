@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/asn1"
 	"math/big"
+	"os"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/pkimetal/pkimetal/internal/mtctest"
@@ -56,6 +58,75 @@ var draft05Expectations = map[string]findingExpectation{
 	"e_rfc9925_unsigned_issuer_unique_id_present":         {"e_rfc9925_unsigned_issuer_unique_id_present", Error, "tbsCertificate.issuerUniqueID", "RFC 9925", "3.2"},
 	"w_rfc9925_unsigned_authority_key_identifier_present": {"w_rfc9925_unsigned_authority_key_identifier_present", Warning, "tbsCertificate.extensions.authorityKeyIdentifier", "RFC 9925", "3.3"},
 	"w_rfc9925_unsigned_issuer_alternative_name_present":  {"w_rfc9925_unsigned_issuer_alternative_name_present", Warning, "tbsCertificate.extensions.issuerAlternativeName", "RFC 9925", "3.3"},
+}
+
+func TestRuleCoverageDocument(t *testing.T) {
+	draftCodes := assertRuleCodeList(t, "draft-05", Draft05RuleCodes)
+	cqrpCodes := assertRuleCodeList(t, "CQRP v0.2.0", CQRP020RuleCodes)
+
+	document, err := os.ReadFile("../doc/MTC_RULE_COVERAGE.md")
+	if err != nil {
+		t.Fatalf("read rule coverage document: %v", err)
+	}
+	body := string(document)
+	codes := append(draftCodes, cqrpCodes...)
+	codes = append(codes, "e_mtc_profile_artifact_mismatch", "b_mtc_rule_panic")
+	for _, code := range codes {
+		if count := strings.Count(body, "`"+code+"`"); count != 1 {
+			t.Errorf("coverage document occurrences of %q = %d, want 1", code, count)
+		}
+	}
+
+	validStatuses := map[string]bool{
+		"implemented":           true,
+		"delegated":             true,
+		"not applicable":        true,
+		"not locally decidable": true,
+	}
+	for lineNumber, line := range strings.Split(body, "\n") {
+		if !strings.HasPrefix(line, "| `") {
+			continue
+		}
+		columns := strings.Split(line, "|")
+		if len(columns) != 9 {
+			t.Errorf("coverage row %d has %d columns, want 7: %s", lineNumber+1, len(columns)-2, line)
+			continue
+		}
+		for _, column := range []int{2, 3, 4, 5, 6} {
+			if strings.TrimSpace(columns[column]) == "" {
+				t.Errorf("coverage row %d has blank required metadata: %s", lineNumber+1, line)
+			}
+		}
+		status := strings.TrimSpace(columns[7])
+		if !validStatuses[status] {
+			t.Errorf("coverage row %d has invalid status %q", lineNumber+1, status)
+		}
+	}
+}
+
+func assertRuleCodeList(t *testing.T, name string, list func() []string) []string {
+	t.Helper()
+	first := list()
+	if len(first) == 0 {
+		t.Fatalf("%s rule code list is empty", name)
+	}
+	if !sort.StringsAreSorted(first) {
+		t.Errorf("%s rule codes are not sorted: %q", name, first)
+	}
+	for i, code := range first {
+		if code == "" {
+			t.Errorf("%s rule code %d is blank", name, i)
+		}
+		if i > 0 && code == first[i-1] {
+			t.Errorf("%s rule code %q is duplicated", name, code)
+		}
+	}
+	want := append([]string(nil), first...)
+	first[0] = "caller mutation"
+	if got := list(); !reflect.DeepEqual(got, want) {
+		t.Errorf("%s rule code list shares caller-mutable storage: got %q, want %q", name, got, want)
+	}
+	return want
 }
 
 func TestDraft05ValidArtifactsHaveNoFindings(t *testing.T) {

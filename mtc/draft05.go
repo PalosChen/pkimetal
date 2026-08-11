@@ -5,6 +5,7 @@ import (
 	"encoding/asn1"
 	"math/big"
 	"math/bits"
+	"sort"
 )
 
 const (
@@ -294,6 +295,17 @@ var (
 
 func LintDraft05(artifact *Artifact) []Finding {
 	return runRules(artifact, draft05Rules)
+}
+
+// Draft05RuleCodes returns the stable finding codes registered for draft-05,
+// including the conditional RFC 9925 checks.
+func Draft05RuleCodes() []string {
+	codes := make([]string, len(draft05Rules))
+	for i, rule := range draft05Rules {
+		codes[i] = rule.Code
+	}
+	sort.Strings(codes)
+	return codes
 }
 
 // LintDraft05ForKind evaluates draft-05 rules in an explicit CA or subscriber

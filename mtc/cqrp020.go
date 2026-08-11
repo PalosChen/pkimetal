@@ -3,6 +3,7 @@ package mtc
 import (
 	"bytes"
 	"encoding/asn1"
+	"sort"
 	"time"
 	"unicode/utf8"
 )
@@ -214,6 +215,17 @@ var cqrp020Rules = []Rule{
 // LintCQRP020 evaluates only the CQRP v0.2.0 rules.
 func LintCQRP020(artifact *Artifact) []Finding {
 	return runRules(artifact, cqrp020Rules)
+}
+
+// CQRP020RuleCodes returns the stable finding codes registered for CQRP
+// v0.2.0.
+func CQRP020RuleCodes() []string {
+	codes := make([]string, len(cqrp020Rules))
+	for i, rule := range cqrp020Rules {
+		codes[i] = rule.Code
+	}
+	sort.Strings(codes)
+	return codes
 }
 
 // LintCQRP020ForKind evaluates CQRP rules in an explicit profile context

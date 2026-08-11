@@ -2,6 +2,14 @@
 
 A REST API and web interface that integrates multiple linters to perform pre- and post-issuance linting of PKI artifacts (Certificates, Precertificates, CRLs, and OCSP Responses).
 
+> **Experimental MTC fork:** This fork adds native linting for
+> [Merkle Tree Certificates draft-05](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05)
+> through `mtclint`, plus a separate CQRP v0.2.0 overlay through `cqrplint`.
+> Use the explicit `mtc_ca`, `mtc_subscriber`, `cqrp_mtc_ca`, or
+> `cqrp_mtc_subscriber` profile with `/lintcert` or `/linttbscert`. See the
+> [MTC and CQRP rule coverage](doc/MTC_RULE_COVERAGE.md) for exact scope and
+> offline limitations.
+
 At a glance:
 
 - [Features](#features)
@@ -66,6 +74,8 @@ Special-purpose linters:
 - [ctlint](https://github.com/crtsh/ctlint): Detects non-compliance with browser CT policies, in precertificates and embedded SCT lists.
 - [dwklint](https://github.com/CVE-2008-0166/dwklint): Detects Debian weak keys (CVE-2008-0166), as required by CABForum Ballot [SC-73](https://github.com/cabforum/servercert/pull/500/files#diff-e0ac1bd190515a4f2ec09139d395ef6a8c7e9e5b612957c1f5a2dea80c6a6cfeR1705).
 - [ftfy](https://github.com/rspeer/python-ftfy): Detects mojibake (character encoding mix-ups).
+- [mtclint](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05): Experimental native MTC draft-05 and conditional RFC 9925 certificate linting.
+- `cqrplint`: Experimental native CQRP v0.2.0 overlay linting for explicitly selected CQRP MTC profiles.
 - [pwnedkeys](https://pwnedkeys.com): Detects compromised keys, where the private key was found "in the wild" and reported to the Pwnedkeys service. (NOTE: Since this linter currently involve calling an external API over the internet, it is **disabled by default**; to enable it via an environment variable, set `PKIMETAL_LINTER_PWNEDKEYS_NUMGOROUTINES=<n>` where `<n>` is an integer greater than zero).
 - [rocacheck](https://github.com/titanous/rocacheck): Detects ROCA weak keys (CVE-2017-15361), as required by CABForum Ballot [SC-73](https://github.com/cabforum/servercert/pull/500/files#diff-e0ac1bd190515a4f2ec09139d395ef6a8c7e9e5b612957c1f5a2dea80c6a6cfeR1706).
 

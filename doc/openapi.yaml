@@ -26,11 +26,18 @@ paths:
     post:
       operationId: lintcert
       summary: Lint a Certificate
-      description: Lints a X.509 certificate
+      description: >-
+        Lints a complete X.509 Certificate or Precertificate. Experimental MTC
+        draft-05 and CQRP v0.2.0 linting is selected with an explicit MTC
+        profile; autodetection never selects CQRP.
       tags:
         - cert
+      parameters:
+        - $ref: '#/components/parameters/Profile'
+        - $ref: '#/components/parameters/Format'
+        - $ref: '#/components/parameters/Severity'
       requestBody:
-        $ref: '#/components/requestBodies/LintRequestBody'
+        $ref: '#/components/requestBodies/CertificateLintRequestBody'
       responses:
         '200':
           $ref: '#/components/responses/LintingSuccessful'
@@ -40,11 +47,18 @@ paths:
     post:
       operationId: linttbscert
       summary: Lint a to-be-signed Certificate
-      description: Creates and lints a X.509 certificate from the specified TBSCertificate
+      description: >-
+        Lints an X.509 TBSCertificate by constructing the form needed by
+        compatible linters. MTC checks that require outer Certificate or proof
+        fields do not apply to this endpoint.
       tags:
         - cert
+      parameters:
+        - $ref: '#/components/parameters/Profile'
+        - $ref: '#/components/parameters/Format'
+        - $ref: '#/components/parameters/Severity'
       requestBody:
-        $ref: '#/components/requestBodies/LintRequestBody'
+        $ref: '#/components/requestBodies/TBSCertificateLintRequestBody'
       responses:
         '200':
           $ref: '#/components/responses/LintingSuccessful'
@@ -148,6 +162,34 @@ paths:
           description: Not found
 
 components:
+  parameters:
+    Profile:
+      name: profile
+      in: query
+      required: false
+      description: >-
+        Profile name. MTC values are mtc_ca, mtc_subscriber, cqrp_mtc_ca, and
+        cqrp_mtc_subscriber. Omit or use autodetect for structural detection;
+        CQRP profiles must be explicit. Other legacy profile names remain
+        supported and are intentionally not constrained by an enum.
+      schema:
+        type: string
+        default: autodetect
+    Format:
+      name: format
+      in: query
+      required: false
+      description: Response format; overrides Accept when present.
+      schema:
+        $ref: '#/components/schemas/ResponseFormat'
+    Severity:
+      name: severity
+      in: query
+      required: false
+      description: Minimum included severity. Use meta to include status metadata.
+      schema:
+        $ref: '#/components/schemas/FindingSeverity'
+
   requestBodies:
     LintRequestBody:
       description: The parameters for the linting request
@@ -157,20 +199,143 @@ components:
           schema:
             $ref: '#/components/schemas/LintRequest'
 
-  responses:
-    BadRequest:
-      description: Invalid request (e.g., empty body, unrecognised input/profile/severity/format)
+    CertificateLintRequestBody:
+      description: >-
+        A PEM/Base64 form value or a raw complete DER Certificate. For raw DER,
+        send profile, format, and severity as query parameters.
+      required: true
       content:
-        text/plain:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '#/components/schemas/LintRequest'
+          examples:
+            mtcCA:
+              summary: Explicit MTC CA profile
+              value:
+                b64input: BASE64_OR_PEM_CERTIFICATE_FROM_THE_CALLER
+                profile: mtc_ca
+                format: json
+            cqrpMTCSubscriber:
+              summary: Explicit CQRP MTC subscriber profile
+              value:
+                b64input: BASE64_OR_PEM_CERTIFICATE_FROM_THE_CALLER
+                profile: cqrp_mtc_subscriber
+                format: json
+        application/pkix-cert:
           schema:
             type: string
+            format: binary
+          examples:
+            completeCertificate:
+              summary: Caller-provided complete DER Certificate
+              description: Binary body; no certificate bytes are fabricated here.
+              value: CALLER_PROVIDED_DER_CERTIFICATE
 
-    LintingSuccessful:
-      description: The response for the specified linting request
+    TBSCertificateLintRequestBody:
+      description: >-
+        A PEM/Base64 form value or a raw DER TBSCertificate. For raw DER, send
+        profile, format, and severity as query parameters.
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '#/components/schemas/LintRequest'
+          examples:
+            mtcSubscriber:
+              summary: Explicit MTC subscriber profile
+              value:
+                b64input: BASE64_OR_PEM_TBS_CERTIFICATE_FROM_THE_CALLER
+                profile: mtc_subscriber
+                format: json
+            cqrpMTCCA:
+              summary: Explicit CQRP MTC CA profile
+              value:
+                b64input: BASE64_OR_PEM_TBS_CERTIFICATE_FROM_THE_CALLER
+                profile: cqrp_mtc_ca
+                format: json
+        application/octet-stream:
+          schema:
+            type: string
+            format: binary
+          examples:
+            tbsCertificate:
+              summary: Caller-provided DER TBSCertificate
+              description: Binary body; no certificate bytes are fabricated here.
+              value: CALLER_PROVIDED_DER_TBS_CERTIFICATE
+
+  responses:
+    BadRequest:
+      description: >-
+        HTTP 400 for an empty body, unsupported media type, invalid PEM/Base64,
+        Certificate or TBSCertificate parse failure, or unrecognised
+        input/profile/severity/format. A recognized response format uses its
+        normal representation. JSON is a one-item LintResponse with a pkimetal
+        fatal finding and usually no Code or Field. An invalid format may return
+        an empty text body.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/LintResponse'
+          example:
+            - Linter: pkimetal
+              Finding: Unrecognised input
+              Severity: fatal
+        text/html:
+          schema:
+            type: string
+        text/plain:
+          schema:
+            type: string
+          examples:
+            parseFailure:
+              value: "pkimetal\tFATAL\tUnrecognised input\n"
+            invalidFormat:
+              summary: An unrecognised format can have an empty body
+              value: ''
+
+    LintingSuccessful:
+      description: >-
+        HTTP 200 lint result. A malformed MTC proof is a successful request with
+        a fatal lint finding, not an HTTP 400 parse error. At severity=meta the
+        array also includes the selected profile, native linter versions, and
+        availability/applicability or skip-reason items.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LintResponse'
+          examples:
+            metadataAndSkip:
+              summary: Selected profile, native version, and exact zcrypto skip reason
+              value:
+                - Linter: pkimetal
+                  Finding: "Profile: mtc_subscriber; Version: <pkimetal-version>"
+                  Severity: meta
+                - Linter: mtclint
+                  Finding: "Queued: <duration>; Runtime: <duration>; Version: draft-05"
+                  Severity: meta
+                - Linter: zlint
+                  Finding: "zlint: Not used [Available:true, Applicable:false] [Reason:zcrypto could not safely parse this MTC artifact]"
+                  Severity: meta
+            cqrpMetadata:
+              summary: CQRP runs both native linters
+              value:
+                - Linter: pkimetal
+                  Finding: "Profile: cqrp_mtc_subscriber; Version: <pkimetal-version>"
+                  Severity: meta
+                - Linter: cqrplint
+                  Finding: "Queued: <duration>; Runtime: <duration>; Version: v0.2.0"
+                  Severity: meta
+                - Linter: mtclint
+                  Finding: "Queued: <duration>; Runtime: <duration>; Version: draft-05"
+                  Severity: meta
+            malformedMTCProof:
+              summary: A malformed proof is an HTTP 200 fatal lint finding
+              value:
+                - Linter: mtclint
+                  Finding: MTCProof is malformed
+                  Field: signatureValue
+                  Code: f_mtc_proof_malformed
+                  Severity: fatal
         text/html:
           schema:
             type: string
@@ -208,20 +373,28 @@ components:
       properties:
         b64input:
           type: string
-          description: The Base64 or PEM-encoded input
+          description: >-
+            The caller's Base64 or PEM-encoded input. Endpoint-specific aliases
+            such as b64cert and b64tbscert are also accepted.
         format:
           $ref: '#/components/schemas/ResponseFormat'
         profile:
           type: string
-          description: The name of a profile
+          description: >-
+            Profile name. The four MTC values are mtc_ca, mtc_subscriber,
+            cqrp_mtc_ca, and cqrp_mtc_subscriber. Legacy names remain supported,
+            so this property intentionally has no enum.
           default: autodetect
         severity:
           $ref: '#/components/schemas/FindingSeverity'
 
     LintResponse:
-        type: array
-        items:
-          $ref: '#/components/schemas/LintFinding'
+      type: array
+      description: >-
+        Flat result array. Metadata uses the same item schema as lint findings;
+        there is no separate meta object.
+      items:
+        $ref: '#/components/schemas/LintFinding'
 
     LintFinding:
       type: object
@@ -232,10 +405,12 @@ components:
       properties:
         Linter:
           type: string
-          description: The name of the linter that reported the finding
+          description: The linter name, including pkimetal for request/profile metadata.
         Finding:
           type: string
-          description: A textual description of the finding
+          description: >-
+            Finding or metadata text. Skipped linters report Available and
+            Applicable booleans and an optional Reason in this field.
         Severity:
           $ref: '#/components/schemas/FindingSeverity'
         Code:
