@@ -110,6 +110,37 @@ func TestParseRejectsEOCAlgorithmParameters(t *testing.T) {
 	}
 }
 
+func TestParseRetainsLessCommonAlgorithmParameters(t *testing.T) {
+	tests := []struct {
+		name        string
+		parameters  []byte
+		tag         int
+		constructed bool
+	}{
+		{"EXTERNAL", []byte{0x28, 0x04, 0xa0, 0x02, 0x05, 0x00}, 8, true},
+		{"zero REAL", []byte{0x09, 0x00}, 9, false},
+		{"decimal REAL", []byte{0x09, 0x07, 0x03, '1', '5', '.', 'E', '-', '1'}, 9, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := mtctest.ValidSubscriberTemplate()
+			tpl.SPKIAlgorithm.ParametersPresent = true
+			tpl.SPKIAlgorithm.Parameters = tc.parameters
+			got, err := mtc.Parse(mtctest.Certificate(tpl), mtc.InputCertificate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			parameters := got.SubjectPublicKey.Algorithm.Parameters
+			if parameters.Tag != tc.tag || parameters.IsCompound != tc.constructed {
+				t.Fatalf("parameters tag/form = %d/%t", parameters.Tag, parameters.IsCompound)
+			}
+			if !bytes.Equal(parameters.FullBytes, tc.parameters) {
+				t.Fatalf("parameters raw = %x, want %x", parameters.FullBytes, tc.parameters)
+			}
+		})
+	}
+}
+
 func TestParseRetainsNonByteAlignedSignature(t *testing.T) {
 	tpl := mtctest.ValidSubscriberTemplate()
 	tpl.Signature = []byte{0xaa, 0xa8}

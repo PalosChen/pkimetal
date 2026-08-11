@@ -11,9 +11,29 @@ import (
 )
 
 const (
-	classUniversal = 0
-	classContext   = 2
-	maxDERDepth    = 64
+	classUniversal           = 0
+	classContext             = 2
+	maxDERDepth              = 64
+	tagEndOfContents         = 0
+	tagObjectDescriptor      = 7
+	tagExternal              = 8
+	tagReal                  = 9
+	tagEmbeddedPDV           = 11
+	tagRelativeOID           = 13
+	tagTime                  = 14
+	tagReserved              = 15
+	tagVideotexString        = 21
+	tagGraphicString         = 25
+	tagVisibleString         = 26
+	tagUniversalString       = 28
+	tagCharacterString       = 29
+	tagDate                  = 31
+	tagTimeOfDay             = 32
+	tagDateTime              = 33
+	tagDuration              = 34
+	tagOIDIRI                = 35
+	tagRelativeOIDIRI        = 36
+	lastAssignedUniversalTag = tagRelativeOIDIRI
 )
 
 type derValue struct {
@@ -143,11 +163,17 @@ func validateDER(value derValue, depth int) error {
 }
 
 func validateUniversalDER(value derValue) error {
-	if value.tag == asn1.TagSequence || value.tag == asn1.TagSet {
+	switch value.tag {
+	case tagEndOfContents, tagReserved:
+		return fmt.Errorf("reserved universal DER tag %d", value.tag)
+	case tagExternal, tagEmbeddedPDV, asn1.TagSequence, asn1.TagSet, tagCharacterString:
 		if !value.constructed {
-			return errors.New("primitive DER SEQUENCE or SET")
+			return fmt.Errorf("primitive universal DER tag %d is not permitted", value.tag)
 		}
 		return nil
+	}
+	if value.tag > lastAssignedUniversalTag {
+		return fmt.Errorf("unassigned universal DER tag %d", value.tag)
 	}
 	if value.constructed {
 		return fmt.Errorf("constructed universal DER tag %d is not permitted", value.tag)
@@ -191,9 +217,16 @@ func validateUniversalDER(value derValue) error {
 		if !utf8.Valid(value.contents) {
 			return errors.New("invalid DER UTF8String")
 		}
-	case 13: // RELATIVE-OID
+	case tagRelativeOID:
 		if !isMinimalBase128(value.contents) {
 			return errors.New("invalid DER RELATIVE-OID")
+		}
+	case tagObjectDescriptor, tagTime, tagVideotexString, tagGraphicString:
+		// These schema-driven character types remain opaque in ANY values.
+		return nil
+	case tagReal:
+		if !validDERReal(value.contents) {
+			return errors.New("invalid or non-canonical DER REAL")
 		}
 	case asn1.TagNumericString:
 		if !allBytes(value.contents, isNumericStringByte) {
@@ -218,14 +251,14 @@ func validateUniversalDER(value derValue) error {
 		if err := validateGeneralizedTime(value); err != nil {
 			return err
 		}
-	case 26: // VisibleString
+	case tagVisibleString:
 		if !allBytes(value.contents, func(b byte) bool { return b >= 0x20 && b <= 0x7e }) {
 			return errors.New("invalid DER VisibleString")
 		}
 	case asn1.TagGeneralString:
 		// GeneralString uses an octet-oriented character repertoire.
 		return nil
-	case 28: // UniversalString
+	case tagUniversalString:
 		if !validUniversalString(value.contents) {
 			return errors.New("invalid DER UniversalString")
 		}
@@ -233,10 +266,75 @@ func validateUniversalDER(value derValue) error {
 		if !validBMPString(value.contents) {
 			return errors.New("invalid DER BMPString")
 		}
-	default:
-		return fmt.Errorf("unsupported or reserved universal DER tag %d", value.tag)
+	case tagDate, tagTimeOfDay, tagDateTime, tagDuration:
+		if !allBytes(value.contents, func(b byte) bool { return b <= 0x7f }) {
+			return fmt.Errorf("invalid DER universal time type %d", value.tag)
+		}
+	case tagOIDIRI, tagRelativeOIDIRI:
+		if !utf8.Valid(value.contents) {
+			return fmt.Errorf("invalid DER OID internationalized resource identifier type %d", value.tag)
+		}
 	}
 	return nil
+}
+
+func validDERReal(contents []byte) bool {
+	if len(contents) == 0 {
+		return true
+	}
+	if len(contents) == 1 && contents[0] >= 0x40 && contents[0] <= 0x43 {
+		return true
+	}
+	first := contents[0]
+	if first&0x80 == 0 {
+		return first == 0x03 && validDERDecimalReal(contents[1:])
+	}
+	if first&0x30 != 0 || first&0x0c != 0 {
+		return false
+	}
+	exponentLength := int(first&0x03) + 1
+	offset := 1
+	if exponentLength == 4 {
+		if len(contents) < 2 || contents[1] <= 3 {
+			return false
+		}
+		exponentLength = int(contents[1])
+		offset++
+	}
+	if exponentLength >= len(contents)-offset {
+		return false
+	}
+	exponent := contents[offset : offset+exponentLength]
+	if !isMinimalInteger(exponent) {
+		return false
+	}
+	mantissa := contents[offset+exponentLength:]
+	return mantissa[0] != 0 && mantissa[len(mantissa)-1]&1 == 1
+}
+
+func validDERDecimalReal(contents []byte) bool {
+	marker := bytes.Index(contents, []byte(".E"))
+	if marker < 1 || marker+2 >= len(contents) {
+		return false
+	}
+	mantissa := contents[:marker]
+	if mantissa[0] == '-' {
+		mantissa = mantissa[1:]
+	}
+	if len(mantissa) == 0 || !allBytes(mantissa, isDigit) || mantissa[0] == '0' || mantissa[len(mantissa)-1] == '0' {
+		return false
+	}
+	exponent := contents[marker+2:]
+	if bytes.Equal(exponent, []byte("+0")) {
+		return true
+	}
+	if exponent[0] == '+' {
+		return false
+	}
+	if exponent[0] == '-' {
+		exponent = exponent[1:]
+	}
+	return len(exponent) != 0 && exponent[0] != '0' && allBytes(exponent, isDigit)
 }
 
 func validateUTCTime(value derValue) error {
