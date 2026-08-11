@@ -26,10 +26,11 @@ type RequestInfo struct {
 	profileId       linter.ProfileId
 	minimumSeverity linter.SeverityLevel
 	// Input(s), in various original/processed forms.
-	b64Input     []byte // PEM or base64-encoded string.
-	decodedInput []byte
-	cert         *x509.Certificate
-	mtcArtifact  *mtc.Artifact
+	b64Input      []byte // PEM or base64-encoded string.
+	decodedInput  []byte
+	cert          *x509.Certificate
+	mtcArtifact   *mtc.Artifact
+	legacyCertErr error
 }
 
 type LintResult struct {
@@ -83,6 +84,8 @@ func POST(fhctx *fasthttp.RequestCtx, path string) int {
 		} else if requestBody := fhctx.Request.Body(); len(requestBody) == 0 {
 			errorMessage = "Empty request body"
 		} else if err = ri.GetInput(fhctx); err != nil {
+			errorMessage = "Unrecognised input"
+		} else if err = ri.deferredCertificateInputError(paramS(fhctx, "profile")); err != nil {
 			errorMessage = "Unrecognised input"
 		} else if !ri.GetProfile(paramS(fhctx, "profile")) {
 			errorMessage = "Unrecognised profile"

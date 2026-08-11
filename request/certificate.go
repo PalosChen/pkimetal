@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/pkimetal/pkimetal/linter"
 	"github.com/pkimetal/pkimetal/mtc"
 	"github.com/pkimetal/pkimetal/utils"
 
@@ -42,8 +43,9 @@ func (ri *RequestInfo) parseCertificateInput() (cert *x509.Certificate, err erro
 		return nil, err
 	}
 
-	processed, cert, artifact, err := parseCertificateBytes(ri.decodedInput, inputKind, x509.ParseCertificate)
+	processed, cert, artifact, legacyErr, err := parseCertificateBytesWithLegacyError(ri.decodedInput, inputKind, x509.ParseCertificate)
 	ri.mtcArtifact = artifact
+	ri.legacyCertErr = legacyErr
 	if processed != nil {
 		ri.decodedInput = processed
 		// Preserve the existing normalized representation for linter fanout.
@@ -56,31 +58,50 @@ func (ri *RequestInfo) parseCertificateInput() (cert *x509.Certificate, err erro
 }
 
 func parseCertificateBytes(decoded []byte, inputKind mtc.InputKind, parseLegacy func([]byte) (*x509.Certificate, error)) (processed []byte, cert *x509.Certificate, artifact *mtc.Artifact, err error) {
+	processed, cert, artifact, _, err = parseCertificateBytesWithLegacyError(decoded, inputKind, parseLegacy)
+	return
+}
+
+func parseCertificateBytesWithLegacyError(decoded []byte, inputKind mtc.InputKind, parseLegacy func([]byte) (*x509.Certificate, error)) (processed []byte, cert *x509.Certificate, artifact *mtc.Artifact, legacyErr error, err error) {
 	artifact, mtcErr := mtc.Parse(decoded, inputKind)
 	if mtcErr == nil {
 		legacyInput := append([]byte(nil), decoded...)
 		if inputKind == mtc.InputTBSCertificate {
 			if legacyInput, err = makeDummyCertificateBytes(decoded); err != nil {
-				return decoded, nil, artifact, nil
+				return decoded, nil, artifact, nil, nil
 			}
 		}
-		if legacyCert, legacyErr := parseLegacyCertificate(legacyInput, parseLegacy); legacyErr == nil {
+		if legacyCert, parseErr := parseLegacyCertificate(legacyInput, parseLegacy); parseErr == nil {
 			cert = legacyCert
+		} else if artifact.Kind == mtc.ArtifactUnknown {
+			legacyErr = parseErr
 		}
-		return decoded, cert, artifact, nil
+		return decoded, cert, artifact, legacyErr, nil
 	}
 
 	processed = decoded
 	if inputKind == mtc.InputTBSCertificate {
 		if processed, err = makeDummyCertificateBytes(decoded); err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 	} else if inputKind != mtc.InputCertificate {
-		return nil, nil, nil, fmt.Errorf("unsupported certificate input kind %d", inputKind)
+		return nil, nil, nil, nil, fmt.Errorf("unsupported certificate input kind %d", inputKind)
 	}
 
 	cert, err = parseLegacyCertificate(processed, parseLegacy)
-	return processed, cert, nil, err
+	return processed, cert, nil, nil, err
+}
+
+func (ri *RequestInfo) deferredCertificateInputError(profileName string) error {
+	if ri.legacyCertErr == nil {
+		return nil
+	}
+	for profileID, profile := range linter.AllProfiles {
+		if profile.Name == profileName && linter.IsMTCProfile(profileID) {
+			return nil
+		}
+	}
+	return ri.legacyCertErr
 }
 
 func parseLegacyCertificate(input []byte, parseLegacy func([]byte) (*x509.Certificate, error)) (cert *x509.Certificate, err error) {

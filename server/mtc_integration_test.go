@@ -17,10 +17,12 @@ import (
 	"github.com/pkimetal/pkimetal/linter"
 	_ "github.com/pkimetal/pkimetal/linter/cqrplint"
 	_ "github.com/pkimetal/pkimetal/linter/mtclint"
+	"github.com/pkimetal/pkimetal/mtc"
 	"github.com/pkimetal/pkimetal/request"
 
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttputil"
+	"github.com/zmap/zcrypto/x509"
 )
 
 type mtcHTTPTestServer struct {
@@ -67,6 +69,7 @@ func TestMTCCertificateEndpoints(t *testing.T) {
 	t.Run("malformed proof", func(t *testing.T) { testMTCMalformedProof(t, h) })
 	t.Run("profile mismatch", func(t *testing.T) { testMTCProfileMismatch(t, h) })
 	t.Run("explicit unknown artifacts", func(t *testing.T) { testMTCExplicitUnknownArtifacts(t, h) })
+	t.Run("legacy parse error routing", func(t *testing.T) { testMTCLegacyParseErrorRouting(t, h) })
 	t.Run("TBS exclusions", func(t *testing.T) { testMTCTBSExclusions(t, h) })
 	t.Run("JSON schema", func(t *testing.T) { testMTCJSONSchema(t, h) })
 }
@@ -498,6 +501,56 @@ func testMTCExplicitUnknownArtifacts(t *testing.T, h *mtcHTTPTestServer) {
 			}
 		})
 	}
+}
+
+func testMTCLegacyParseErrorRouting(t *testing.T, h *mtcHTTPTestServer) {
+	template := mtctest.ValidCQRPSubscriberTemplate()
+	template.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDSHA256}
+	template.OuterSignature = template.TBSSignature
+	template.Issuer = []byte{0x30, 0x00}
+	template.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDRSAEncryption, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}
+	mtctest.RemoveExtension(&template, mtctest.OIDMTC_CA)
+	certificate := mtctest.Certificate(template)
+
+	artifact, err := mtc.Parse(certificate, mtc.InputCertificate)
+	if err != nil || artifact.Kind != mtc.ArtifactUnknown {
+		t.Fatalf("native parse = %#v, %v; want unknown artifact", artifact, err)
+	}
+	if cert, err := x509.ParseCertificate(certificate); err == nil || cert != nil {
+		t.Fatalf("legacy parse = %#v, %v; want rejection", cert, err)
+	}
+
+	for _, tc := range []struct {
+		name    string
+		profile string
+	}{
+		{"explicit legacy", "rfc5280_leaf"},
+		{"explicit autodetect", "autodetect"},
+		{"implicit autodetect", ""},
+		{"invalid profile preserves input precedence", "not-a-profile"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			response := h.postJSON(t, mtcHTTPRequest{
+				path:        "/lintcert",
+				profile:     tc.profile,
+				contentType: "application/pkix-cert",
+				body:        certificate,
+			})
+			assertStatusAndContentType(t, response, fasthttp.StatusBadRequest, "application/json; charset=UTF-8")
+			assertFindingTextContains(t, response.results, linter.PKIMETAL_NAME, "Unrecognised input")
+			assertNoProfileMeta(t, response.results)
+		})
+	}
+
+	response := h.postJSON(t, mtcHTTPRequest{
+		path:        "/lintcert",
+		profile:     "mtc_subscriber",
+		contentType: "application/pkix-cert",
+		body:        certificate,
+	})
+	assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+	assertProfileMeta(t, response.results, "mtc_subscriber")
+	assertNoFatalOrBug(t, response.results)
 }
 
 func testMTCTBSExclusions(t *testing.T, h *mtcHTTPTestServer) {
