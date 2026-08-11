@@ -47,6 +47,9 @@ type config struct {
 		Ctlint struct {
 			NumGoroutines int `mapstructure:"numGoroutines"`
 		}
+		Cqrplint struct {
+			NumGoroutines int `mapstructure:"numGoroutines"`
+		} `mapstructure:"cqrplint"`
 		Dwklint struct {
 			NumGoroutines   int    `mapstructure:"numGoroutines"`
 			BlocklistDBPath string `mapstructure:"blocklistDBPath"`
@@ -55,6 +58,9 @@ type config struct {
 			NumProcesses int    `mapstructure:"numProcesses"`
 			PythonDir    string `mapstructure:"pythonDir"`
 		}
+		Mtclint struct {
+			NumGoroutines int `mapstructure:"numGoroutines"`
+		} `mapstructure:"mtclint"`
 		Pkilint struct {
 			NumProcesses int    `mapstructure:"numProcesses"`
 			PythonDir    string `mapstructure:"pythonDir"`
@@ -195,10 +201,12 @@ func initViper() error {
 	viper.SetDefault("linter.certlint.numProcesses", 1)
 	viper.SetDefault("linter.certlint.rubyDir", "autodetect")
 	viper.SetDefault("linter.ctlint.numGoroutines", 1)
+	viper.SetDefault("linter.cqrplint.numGoroutines", 1)
 	viper.SetDefault("linter.dwklint.numGoroutines", 1)
 	viper.SetDefault("linter.dwklint.blocklistDBPath", "")
 	viper.SetDefault("linter.ftfy.numProcesses", 1)
 	viper.SetDefault("linter.ftfy.pythonDir", "autodetect")
+	viper.SetDefault("linter.mtclint.numGoroutines", 1)
 	viper.SetDefault("linter.pkilint.numProcesses", 1)
 	viper.SetDefault("linter.pkilint.pythonDir", "autodetect")
 	viper.SetDefault("linter.pwnedkeys.numGoroutines", 0)
