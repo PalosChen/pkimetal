@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkimetal/pkimetal/config"
 	"github.com/pkimetal/pkimetal/linter"
+	"github.com/pkimetal/pkimetal/linter/internal/mtcadapter"
 	"github.com/pkimetal/pkimetal/mtc"
 )
 
@@ -16,7 +17,7 @@ func init() {
 		Name:         "mtclint",
 		Version:      "draft-05",
 		Url:          "https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05",
-		Unsupported:  unsupportedProfiles(linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER),
+		Unsupported:  mtcadapter.UnsupportedProfiles(linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER),
 		NumInstances: config.Config.Linter.Mtclint.NumGoroutines,
 		Interface:    func() linter.LinterInterface { return &MTCLint{} },
 	}).Register()
@@ -48,7 +49,7 @@ func (l *MTCLint) HandleRequest(_ context.Context, _ *linter.LinterInstance, req
 		})
 	}
 
-	return append(results, convertFindings(mtc.LintDraft05ForKind(req.MTCArtifact, expected))...)
+	return append(results, mtcadapter.ConvertFindings(mtc.LintDraft05ForKind(req.MTCArtifact, expected))...)
 }
 
 func (l *MTCLint) ProcessResult(result linter.LintingResult) linter.LintingResult {
@@ -85,50 +86,5 @@ func artifactKindName(kind mtc.ArtifactKind) string {
 		return "subscriber"
 	default:
 		return fmt.Sprintf("unrecognized (%d)", kind)
-	}
-}
-
-func unsupportedProfiles(supported ...linter.ProfileId) []linter.ProfileId {
-	supportedSet := make(map[linter.ProfileId]struct{}, len(supported))
-	for _, profile := range supported {
-		supportedSet[profile] = struct{}{}
-	}
-	unsupported := make([]linter.ProfileId, 0, len(linter.AllProfiles)-len(supportedSet))
-	for profile := linter.ProfileId(0); profile < linter.ProfileId(len(linter.AllProfiles)); profile++ {
-		if _, ok := supportedSet[profile]; !ok {
-			unsupported = append(unsupported, profile)
-		}
-	}
-	return unsupported
-}
-
-func convertFindings(findings []mtc.Finding) []linter.LintingResult {
-	if len(findings) == 0 {
-		return nil
-	}
-	results := make([]linter.LintingResult, 0, len(findings))
-	for _, finding := range findings {
-		results = append(results, linter.LintingResult{
-			Finding:  fmt.Sprintf("[%s §%s] %s", finding.Source, finding.Section, finding.Message),
-			Field:    finding.Field,
-			Code:     finding.Code,
-			Severity: severity(finding.Severity),
-		})
-	}
-	return results
-}
-
-func severity(value mtc.Severity) linter.SeverityLevel {
-	switch value {
-	case mtc.Warning:
-		return linter.SEVERITY_WARNING
-	case mtc.Error:
-		return linter.SEVERITY_ERROR
-	case mtc.Bug:
-		return linter.SEVERITY_BUG
-	case mtc.Fatal:
-		return linter.SEVERITY_FATAL
-	default:
-		return linter.SEVERITY_BUG
 	}
 }

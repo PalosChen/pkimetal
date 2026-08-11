@@ -382,6 +382,8 @@ func GetPackageVersion(packageNamePrefix string) string {
 func VersionString(version string) string {
 	if version == NOT_INSTALLED {
 		return "[" + version + "]"
+	} else if strings.HasPrefix(version, "draft-") {
+		return version
 	} else if strings.Contains(version, "-g") {
 		// git describe format: v0.0.0-0-gabcdef1
 		return version

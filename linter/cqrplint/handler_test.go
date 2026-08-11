@@ -27,7 +27,7 @@ func TestRegistration(t *testing.T) {
 	if got.Version != "v0.2.0" {
 		t.Errorf("version = %q, want v0.2.0", got.Version)
 	}
-	if got.Url != "../../doc/superpowers/specs/2026-08-11-mtc-pkimetal-design.md#source-baselines" {
+	if got.Url != "https://github.com/pkimetal/pkimetal/blob/main/doc/superpowers/specs/2026-08-11-mtc-pkimetal-design.md#source-baselines" {
 		t.Errorf("URL = %q", got.Url)
 	}
 	if got.NumInstances != 1 {
@@ -52,36 +52,6 @@ func TestInstanceLifecycleAndResultProcessing(t *testing.T) {
 	want := linter.LintingResult{Finding: "finding", Field: "field", Code: "code", Severity: linter.SEVERITY_FATAL}
 	if got := handler.ProcessResult(want); got != want {
 		t.Fatalf("ProcessResult() = %#v, want %#v", got, want)
-	}
-}
-
-func TestConvertFindingsPreservesMetadataAndMapsSeverities(t *testing.T) {
-	findings := []mtc.Finding{
-		{Code: "warning", Field: "warning.field", Source: "CQRP v0.2.0", Section: "4.5.2", Message: "warning message", Severity: mtc.Warning},
-		{Code: "error", Field: "error.field", Source: "CQRP v0.2.0", Section: "2.1", Message: "error message", Severity: mtc.Error},
-		{Code: "bug", Field: "bug.field", Source: "source", Section: "1", Message: "bug message", Severity: mtc.Bug},
-		{Code: "fatal", Field: "fatal.field", Source: "source", Section: "2", Message: "fatal message", Severity: mtc.Fatal},
-		{Code: "unknown", Field: "unknown.field", Source: "source", Section: "3", Message: "unknown message", Severity: mtc.Severity(0)},
-	}
-	wantSeverities := []linter.SeverityLevel{
-		linter.SEVERITY_WARNING,
-		linter.SEVERITY_ERROR,
-		linter.SEVERITY_BUG,
-		linter.SEVERITY_FATAL,
-		linter.SEVERITY_BUG,
-	}
-	got := convertFindings(findings)
-	if len(got) != len(findings) {
-		t.Fatalf("result count = %d, want %d", len(got), len(findings))
-	}
-	for i := range got {
-		if got[i].Code != findings[i].Code || got[i].Field != findings[i].Field || got[i].Severity != wantSeverities[i] {
-			t.Errorf("result %d = %#v", i, got[i])
-		}
-		wantFinding := fmt.Sprintf("[%s §%s] %s", findings[i].Source, findings[i].Section, findings[i].Message)
-		if got[i].Finding != wantFinding {
-			t.Errorf("finding %d = %q, want %q", i, got[i].Finding, wantFinding)
-		}
 	}
 }
 

@@ -54,26 +54,6 @@ func TestInstanceLifecycleAndResultProcessing(t *testing.T) {
 	}
 }
 
-func TestConvertFindings(t *testing.T) {
-	findings := []mtc.Finding{
-		{Code: "warning", Field: "w.field", Source: "Warning Source", Section: "1.2", Message: "warning message", Severity: mtc.Warning},
-		{Code: "error", Field: "e.field", Source: "Error Source", Section: "2.3", Message: "error message", Severity: mtc.Error},
-		{Code: "bug", Field: "b.field", Source: "Bug Source", Section: "3.4", Message: "bug message", Severity: mtc.Bug},
-		{Code: "fatal", Field: "f.field", Source: "Fatal Source", Section: "4.5", Message: "fatal message", Severity: mtc.Fatal},
-		{Code: "unknown", Field: "u.field", Source: "Unknown Source", Section: "5.6", Message: "unknown message", Severity: mtc.Severity(255)},
-	}
-	want := []linter.LintingResult{
-		{Code: "warning", Field: "w.field", Finding: "[Warning Source §1.2] warning message", Severity: linter.SEVERITY_WARNING},
-		{Code: "error", Field: "e.field", Finding: "[Error Source §2.3] error message", Severity: linter.SEVERITY_ERROR},
-		{Code: "bug", Field: "b.field", Finding: "[Bug Source §3.4] bug message", Severity: linter.SEVERITY_BUG},
-		{Code: "fatal", Field: "f.field", Finding: "[Fatal Source §4.5] fatal message", Severity: linter.SEVERITY_FATAL},
-		{Code: "unknown", Field: "u.field", Finding: "[Unknown Source §5.6] unknown message", Severity: linter.SEVERITY_BUG},
-	}
-	if got := convertFindings(findings); !reflect.DeepEqual(got, want) {
-		t.Fatalf("convertFindings() =\n%#v\nwant\n%#v", got, want)
-	}
-}
-
 func TestDraftProfilesHandleValidArtifactsAndMutations(t *testing.T) {
 	tests := []struct {
 		name     string
