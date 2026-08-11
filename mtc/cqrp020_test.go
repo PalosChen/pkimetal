@@ -15,11 +15,13 @@ var cqrp020Expectations = map[string]findingExpectation{
 	"e_cqrp_ca_spki_algorithm":                   {"e_cqrp_ca_spki_algorithm", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.1"},
 	"e_cqrp_ca_spki_parameters_present":          {"e_cqrp_ca_spki_parameters_present", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm.parameters", "CQRP v0.2.0", "4.5.1"},
 	"e_cqrp_ca_spki_encoding":                    {"e_cqrp_ca_spki_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.1"},
+	"e_cqrp_ca_spki_key_encoding":                {"e_cqrp_ca_spki_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.subjectPublicKey", "CQRP v0.2.0", "4.5.1"},
 	"e_cqrp_ca_hash_mldsa":                       {"e_cqrp_ca_hash_mldsa", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.1"},
 	"e_cqrp_ca_key_usage_not_critical":           {"e_cqrp_ca_key_usage_not_critical", Error, "tbsCertificate.extensions.keyUsage", "CQRP v0.2.0", "4.5.1"},
 	"e_cqrp_subscriber_validity_too_long":        {"e_cqrp_subscriber_validity_too_long", Error, "tbsCertificate.validity", "CQRP v0.2.0", "2.1"},
 	"e_cqrp_subscriber_mldsa_parameters_present": {"e_cqrp_subscriber_mldsa_parameters_present", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm.parameters", "CQRP v0.2.0", "4.5.2"},
 	"e_cqrp_subscriber_mldsa_encoding":           {"e_cqrp_subscriber_mldsa_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.2"},
+	"e_cqrp_subscriber_mldsa_key_encoding":       {"e_cqrp_subscriber_mldsa_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.subjectPublicKey", "CQRP v0.2.0", "4.5.2"},
 	"e_cqrp_subscriber_hash_mldsa":               {"e_cqrp_subscriber_hash_mldsa", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.2"},
 	"e_cqrp_subscriber_dv_subject_not_empty":     {"e_cqrp_subscriber_dv_subject_not_empty", Error, "tbsCertificate.subject", "CQRP v0.2.0", "4.5.2"},
 	"e_cqrp_subscriber_policies_missing":         {"e_cqrp_subscriber_policies_missing", Error, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.2.0", "4.5.2"},
@@ -76,10 +78,10 @@ func TestCQRP020CARules(t *testing.T) {
 		}, []string{"e_cqrp_ca_spki_algorithm"}},
 		{"wrong public key length", func(x *mtctest.Template) {
 			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 32)
-		}, []string{"e_cqrp_ca_spki_encoding"}},
+		}, []string{"e_cqrp_ca_spki_key_encoding"}},
 		{"public key not byte aligned", func(x *mtctest.Template) {
 			x.SubjectPublicKeyUnused = 1
-		}, []string{"e_cqrp_ca_spki_encoding"}},
+		}, []string{"e_cqrp_ca_spki_key_encoding"}},
 		{"parameters and encoding", func(x *mtctest.Template) {
 			x.SPKIAlgorithm.ParametersPresent = true
 			x.SPKIAlgorithm.Parameters = []byte{0x05, 0x00}
@@ -107,6 +109,20 @@ func TestCQRP020CARules(t *testing.T) {
 				mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(true)},
 			)
 		}, []string{"e_cqrp_ca_key_usage_not_critical"}},
+		{"duplicate critical key usage keyCertSign then missing", func(x *mtctest.Template) {
+			mtctest.RemoveExtension(x, mtctest.OIDKeyUsage)
+			x.Extensions = append(x.Extensions,
+				mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(true)},
+				mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(false)},
+			)
+		}, []string{"e_cqrp_ca_key_usage_not_critical"}},
+		{"duplicate critical key usage missing then keyCertSign", func(x *mtctest.Template) {
+			mtctest.RemoveExtension(x, mtctest.OIDKeyUsage)
+			x.Extensions = append(x.Extensions,
+				mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(false)},
+				mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(true)},
+			)
+		}, []string{"e_cqrp_ca_key_usage_not_critical"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -114,6 +130,16 @@ func TestCQRP020CARules(t *testing.T) {
 			tc.mutate(&tpl)
 			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
 		})
+	}
+}
+
+func TestCQRP020DuplicateCAKeyUsageMessage(t *testing.T) {
+	tpl := mtctest.ValidCQRPCATemplate()
+	tpl.Extensions = append(tpl.Extensions, mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(true)})
+	findings := LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate))
+	assertCQRPFindings(t, findings, "e_cqrp_ca_key_usage_not_critical")
+	if got, want := findings[0].Message, "CA key usage extension is duplicated, which violates the certificate profile and RFC 5280"; got != want {
+		t.Fatalf("duplicate keyUsage message = %q, want %q", got, want)
 	}
 }
 
@@ -144,14 +170,14 @@ func TestCQRP020SubscriberSPKIAndValidity(t *testing.T) {
 		{"ML-DSA-65 wrong public key length", func(x *mtctest.Template) {
 			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA65}
 			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1312)
-		}, []string{"e_cqrp_subscriber_mldsa_encoding"}},
+		}, []string{"e_cqrp_subscriber_mldsa_key_encoding"}},
 		{"ML-DSA-87 wrong public key length", func(x *mtctest.Template) {
 			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA87}
 			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1952)
-		}, []string{"e_cqrp_subscriber_mldsa_encoding"}},
+		}, []string{"e_cqrp_subscriber_mldsa_key_encoding"}},
 		{"ML-DSA public key not byte aligned", func(x *mtctest.Template) {
 			x.SubjectPublicKeyUnused = 1
-		}, []string{"e_cqrp_subscriber_mldsa_encoding"}},
+		}, []string{"e_cqrp_subscriber_mldsa_key_encoding"}},
 		{"ML-DSA parameters and encoding", func(x *mtctest.Template) {
 			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA65, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}
 			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1952)
@@ -206,6 +232,18 @@ func TestCQRP020SubscriberPolicies(t *testing.T) {
 		{"multiple allowed with non-DV warning", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV, mtctest.OIDPolicyOV)})
 		}, []string{"w_cqrp_subscriber_policy_not_dv"}},
+		{"duplicate DV policy identifier", func(x *mtctest.Template) {
+			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV, mtctest.OIDPolicyDV)})
+		}, []string{"e_cqrp_subscriber_policy_identifier"}},
+		{"duplicate DV around OV suppresses warning", func(x *mtctest.Template) {
+			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV, mtctest.OIDPolicyOV, mtctest.OIDPolicyDV)})
+		}, []string{"e_cqrp_subscriber_policy_identifier"}},
+		{"duplicate DV before OV suppresses warning", func(x *mtctest.Template) {
+			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV, mtctest.OIDPolicyDV, mtctest.OIDPolicyOV)})
+		}, []string{"e_cqrp_subscriber_policy_identifier"}},
+		{"OV before duplicate DV suppresses warning", func(x *mtctest.Template) {
+			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyOV, mtctest.OIDPolicyDV, mtctest.OIDPolicyDV)})
+		}, []string{"e_cqrp_subscriber_policy_identifier"}},
 		{"multiple including invalid", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV, asn1.ObjectIdentifier{1, 2, 3})})
 		}, []string{"e_cqrp_subscriber_policy_identifier"}},
@@ -429,7 +467,11 @@ func TestCQRP020ApplicabilityAndIndependence(t *testing.T) {
 }
 
 func TestCQRP020RegistersExactlyRequiredRules(t *testing.T) {
-	seen := make(map[string]bool, len(cqrp020Expectations))
+	wantCodes := make(map[string]bool, len(cqrp020Expectations))
+	for _, expectation := range cqrp020Expectations {
+		wantCodes[expectation.Code] = true
+	}
+	seen := make(map[string]bool, len(wantCodes))
 	for _, rule := range cqrp020Rules {
 		expectation, ok := cqrp020Expectations[rule.Code]
 		if !ok {
@@ -444,10 +486,10 @@ func TestCQRP020RegistersExactlyRequiredRules(t *testing.T) {
 			t.Errorf("rule %q metadata/applicability = %#v", rule.Code, rule)
 		}
 	}
-	if len(seen) != len(cqrp020Expectations) {
-		t.Errorf("registered %d rules, want %d", len(seen), len(cqrp020Expectations))
+	if len(seen) != len(wantCodes) {
+		t.Errorf("registered %d rules, want %d", len(seen), len(wantCodes))
 	}
-	for code := range cqrp020Expectations {
+	for code := range wantCodes {
 		if !seen[code] {
 			t.Errorf("missing CQRP rule %q", code)
 		}

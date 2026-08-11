@@ -42,8 +42,13 @@ var cqrp020Rules = []Rule{
 	}),
 	cqrp020Rule("e_cqrp_ca_spki_encoding", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		algorithm := a.SubjectPublicKey.Algorithm
-		if algorithm.Algorithm.Equal(OIDMLDSA44) && (!bytes.Equal(algorithm.Raw, mlDSA44AlgorithmDER) || !validMLDSAPublicKey(a.SubjectPublicKey, 1312)) {
-			return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "ML-DSA-44 AlgorithmIdentifier does not have the required encoding")
+		if algorithm.Algorithm.Equal(OIDMLDSA44) {
+			if !bytes.Equal(algorithm.Raw, mlDSA44AlgorithmDER) {
+				return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "ML-DSA-44 AlgorithmIdentifier does not have the required encoding")
+			}
+			if !validMLDSAPublicKey(a.SubjectPublicKey, 1312) {
+				return errorFinding("tbsCertificate.subjectPublicKeyInfo.subjectPublicKey", "ML-DSA-44 subjectPublicKey has an invalid size or bit alignment")
+			}
 		}
 		return nil
 	}),
@@ -55,6 +60,9 @@ var cqrp020Rules = []Rule{
 	}),
 	cqrp020Rule("e_cqrp_ca_key_usage_not_critical", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidKeyUsage)
+		if len(extensions) > 1 {
+			return errorFinding("tbsCertificate.extensions.keyUsage", "CA key usage extension is duplicated, which violates the certificate profile and RFC 5280")
+		}
 		for _, extension := range extensions {
 			if !extension.Critical {
 				return errorFinding("tbsCertificate.extensions.keyUsage", "CA key usage extension is not critical")
@@ -77,8 +85,13 @@ var cqrp020Rules = []Rule{
 	}),
 	cqrp020Rule("e_cqrp_subscriber_mldsa_encoding", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		algorithm := a.SubjectPublicKey.Algorithm
-		if expected, keySize := expectedMLDSAEncoding(algorithm.Algorithm); expected != nil && (!bytes.Equal(algorithm.Raw, expected) || !validMLDSAPublicKey(a.SubjectPublicKey, keySize)) {
-			return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "ML-DSA AlgorithmIdentifier does not have the required encoding")
+		if expected, keySize := expectedMLDSAEncoding(algorithm.Algorithm); expected != nil {
+			if !bytes.Equal(algorithm.Raw, expected) {
+				return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "ML-DSA AlgorithmIdentifier does not have the required encoding")
+			}
+			if !validMLDSAPublicKey(a.SubjectPublicKey, keySize) {
+				return errorFinding("tbsCertificate.subjectPublicKeyInfo.subjectPublicKey", "ML-DSA subjectPublicKey has an invalid size or bit alignment")
+			}
 		}
 		return nil
 	}),
@@ -284,6 +297,7 @@ func parseCertificatePolicies(input []byte) ([]asn1.ObjectIdentifier, bool) {
 		return nil, false
 	}
 	var policies []asn1.ObjectIdentifier
+	seen := make(map[string]struct{})
 	remaining := sequence.contents
 	for len(remaining) != 0 {
 		information, rest, err := parseDER(remaining)
@@ -299,6 +313,11 @@ func parseCertificatePolicies(input []byte) ([]asn1.ObjectIdentifier, bool) {
 		if err != nil {
 			return nil, false
 		}
+		identifierKey := identifier.String()
+		if _, ok := seen[identifierKey]; ok {
+			return nil, false
+		}
+		seen[identifierKey] = struct{}{}
 		if len(contents) != 0 {
 			qualifiers, err := takeDER(&contents, "policyQualifiers")
 			if err != nil || !validPolicyQualifiers(qualifiers) || len(contents) != 0 {
