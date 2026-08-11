@@ -81,6 +81,34 @@ func TestParseRejectsNonCanonicalOrIncompleteDER(t *testing.T) {
 	}
 }
 
+func TestParseValidatesCertificateVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		version byte
+		wantErr bool
+	}{
+		{"explicit v1 default", 0x00, true},
+		{"v2", 0x01, false},
+		{"v3", 0x02, false},
+		{"future version", 0x03, true},
+		{"negative version", 0xff, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			der := mtctest.Certificate(mtctest.ValidSubscriberTemplate())
+			version := []byte{0xa0, 0x03, 0x02, 0x01, 0x02}
+			if bytes.Count(der, version) != 1 {
+				t.Fatal("fixture does not contain exactly one explicit v3 version")
+			}
+			der = bytes.Replace(der, version, []byte{0xa0, 0x03, 0x02, 0x01, tc.version}, 1)
+			_, err := mtc.Parse(der, mtc.InputCertificate)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Parse error = %v, wantErr %t", err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestParseDistinguishesAbsentAndNULLParameters(t *testing.T) {
 	tpl := mtctest.ValidSubscriberTemplate()
 	tpl.SPKIAlgorithm.ParametersPresent = true

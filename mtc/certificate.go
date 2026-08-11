@@ -69,15 +69,25 @@ func parseTBSCertificate(tbs derValue, artifact *Artifact) error {
 	serialDER := first
 	if first.class == classContext && first.tag == 0 && first.constructed {
 		versionContents := first.contents
-		version, err := takeDER(&versionContents, "version")
+		versionDER, err := takeDER(&versionContents, "version")
 		if err != nil {
 			return err
 		}
-		if _, err := parseInteger(version, "version"); err != nil {
+		version, err := parseInteger(versionDER, "version")
+		if err != nil {
 			return err
 		}
 		if err := noRemainingDER(versionContents, "version"); err != nil {
 			return err
+		}
+		// Version is DEFAULT v1: an absent field means v1, while explicitly
+		// encoding v1 is non-canonical DER. Other integers are outside the
+		// TBSCertificate Version type; v2/v3 profile semantics remain lintable.
+		switch {
+		case version.Sign() < 0 || !version.IsInt64() || version.Int64() > 2:
+			return fmt.Errorf("unsupported TBSCertificate version %s", version)
+		case version.Sign() == 0:
+			return errors.New("explicitly encoded default TBSCertificate version v1")
 		}
 		serialDER, err = takeDER(&contents, "serialNumber")
 		if err != nil {

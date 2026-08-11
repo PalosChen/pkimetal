@@ -166,7 +166,12 @@ func validateUniversalDER(value derValue) error {
 	switch value.tag {
 	case tagEndOfContents, tagReserved:
 		return fmt.Errorf("reserved universal DER tag %d", value.tag)
-	case tagExternal, tagEmbeddedPDV, asn1.TagSequence, asn1.TagSet, tagCharacterString:
+	case tagExternal:
+		if !value.constructed {
+			return fmt.Errorf("primitive universal DER tag %d is not permitted", value.tag)
+		}
+		return validateExternal(value)
+	case tagEmbeddedPDV, asn1.TagSequence, asn1.TagSet, tagCharacterString:
 		if !value.constructed {
 			return fmt.Errorf("primitive universal DER tag %d is not permitted", value.tag)
 		}
@@ -188,15 +193,8 @@ func validateUniversalDER(value derValue) error {
 			return errors.New("invalid DER INTEGER")
 		}
 	case asn1.TagBitString:
-		if len(value.contents) == 0 || value.contents[0] > 7 {
+		if !validBitStringContents(value.contents) {
 			return errors.New("invalid DER BIT STRING")
-		}
-		unused := value.contents[0]
-		if len(value.contents) == 1 && unused != 0 {
-			return errors.New("empty DER BIT STRING has unused bits")
-		}
-		if unused != 0 && value.contents[len(value.contents)-1]&byte((1<<unused)-1) != 0 {
-			return errors.New("non-zero unused DER BIT STRING bits")
 		}
 	case asn1.TagOctetString:
 		return nil
@@ -276,6 +274,77 @@ func validateUniversalDER(value derValue) error {
 		}
 	}
 	return nil
+}
+
+func validateExternal(value derValue) error {
+	var components []derValue
+	remaining := value.contents
+	for len(remaining) != 0 {
+		component, rest, err := parseDER(remaining)
+		if err != nil {
+			return fmt.Errorf("invalid EXTERNAL component: %w", err)
+		}
+		components = append(components, component)
+		if len(components) > 4 {
+			return errors.New("too many EXTERNAL components")
+		}
+		remaining = rest
+	}
+
+	index := 0
+	if externalComponentIs(components, index, classUniversal, asn1.TagOID) {
+		index++
+	}
+	if externalComponentIs(components, index, classUniversal, asn1.TagInteger) {
+		index++
+	}
+	if externalComponentIs(components, index, classUniversal, tagObjectDescriptor) {
+		index++
+	}
+	if index >= len(components) {
+		return errors.New("EXTERNAL is missing its encoding component")
+	}
+	if index != len(components)-1 {
+		return errors.New("unexpected or out-of-order EXTERNAL component")
+	}
+	encoding := components[index]
+	if encoding.class != classContext || encoding.tag > 2 {
+		return errors.New("invalid EXTERNAL encoding choice")
+	}
+	switch encoding.tag {
+	case 0:
+		if !encoding.constructed {
+			return errors.New("EXTERNAL single-ASN1-type encoding is primitive")
+		}
+		_, rest, err := parseDER(encoding.contents)
+		if err != nil || len(rest) != 0 {
+			return errors.New("EXTERNAL single-ASN1-type must contain exactly one DER value")
+		}
+	case 1:
+		if encoding.constructed {
+			return errors.New("EXTERNAL octet-aligned encoding is constructed")
+		}
+	case 2:
+		if encoding.constructed || !validBitStringContents(encoding.contents) {
+			return errors.New("invalid EXTERNAL arbitrary encoding BIT STRING")
+		}
+	}
+	return nil
+}
+
+func externalComponentIs(components []derValue, index, class, tag int) bool {
+	return index < len(components) && components[index].class == class && components[index].tag == tag
+}
+
+func validBitStringContents(contents []byte) bool {
+	if len(contents) == 0 || contents[0] > 7 {
+		return false
+	}
+	unused := contents[0]
+	if len(contents) == 1 {
+		return unused == 0
+	}
+	return unused == 0 || contents[len(contents)-1]&byte((1<<unused)-1) == 0
 }
 
 func validDERReal(contents []byte) bool {
