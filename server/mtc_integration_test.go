@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"net"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -195,6 +196,10 @@ func (h *mtcHTTPTestServer) postJSON(t *testing.T, spec mtcHTTPRequest) mtcHTTPR
 func testMTCTransportMatrix(t *testing.T, h *mtcHTTPTestServer) {
 	certificate := mtctest.Certificate(mtctest.ValidSubscriberTemplate())
 	tbs := mtctest.TBSCertificate(mtctest.ValidSubscriberTemplate())
+	tbsPEM, err := os.ReadFile("../mtc/testdata/draft05-subscriber-tbs.pem")
+	if err != nil {
+		t.Fatalf("read TBS certificate fixture: %v", err)
+	}
 	tests := []struct {
 		name string
 		spec mtcHTTPRequest
@@ -203,7 +208,8 @@ func testMTCTransportMatrix(t *testing.T, h *mtcHTTPTestServer) {
 		{"certificate form PEM", mtcHTTPRequest{path: "/lintcert", profile: "mtc_subscriber", contentType: "application/x-www-form-urlencoded", body: []byte(url.Values{"b64cert": {string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certificate}))}}.Encode())}},
 		{"certificate raw DER", mtcHTTPRequest{path: "/lintcert", profile: "mtc_subscriber", contentType: "application/pkix-cert", body: certificate}},
 		{"TBS form base64", mtcHTTPRequest{path: "/linttbscert", profile: "mtc_subscriber", contentType: "application/x-www-form-urlencoded", body: []byte(url.Values{"b64tbscert": {base64.StdEncoding.EncodeToString(tbs)}}.Encode())}},
-		{"TBS form PEM", mtcHTTPRequest{path: "/linttbscert", profile: "mtc_subscriber", contentType: "application/x-www-form-urlencoded", body: []byte(url.Values{"b64tbscert": {string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: tbs}))}}.Encode())}},
+		{"TBS form legacy certificate PEM", mtcHTTPRequest{path: "/linttbscert", profile: "mtc_subscriber", contentType: "application/x-www-form-urlencoded", body: []byte(url.Values{"b64tbscert": {string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: tbs}))}}.Encode())}},
+		{"TBS form standard PEM fixture", mtcHTTPRequest{path: "/linttbscert", profile: "mtc_subscriber", contentType: "application/x-www-form-urlencoded", body: []byte(url.Values{"b64tbscert": {string(tbsPEM)}}.Encode())}},
 		{"TBS raw DER", mtcHTTPRequest{path: "/linttbscert", profile: "mtc_subscriber", contentType: "application/octet-stream", body: tbs}},
 	}
 	for _, tc := range tests {
@@ -305,6 +311,10 @@ func testMTCErrorFormats(t *testing.T, h *mtcHTTPTestServer) {
 func testMTCErrorMatrix(t *testing.T, h *mtcHTTPTestServer) {
 	certificate := mtctest.Certificate(mtctest.ValidSubscriberTemplate())
 	tbs := mtctest.TBSCertificate(mtctest.ValidSubscriberTemplate())
+	tbsPEM, err := os.ReadFile("../mtc/testdata/draft05-subscriber-tbs.pem")
+	if err != nil {
+		t.Fatalf("read TBS certificate fixture: %v", err)
+	}
 	tests := []struct {
 		name        string
 		spec        mtcHTTPRequest
@@ -318,6 +328,7 @@ func testMTCErrorMatrix(t *testing.T, h *mtcHTTPTestServer) {
 		{"invalid severity", mtcHTTPRequest{path: "/lintcert", profile: "mtc_subscriber", severity: "catastrophic", contentType: "application/pkix-cert", body: certificate}, "Unrecognised severity"},
 		{"invalid base64", mtcHTTPRequest{path: "/lintcert", profile: "mtc_subscriber", contentType: "application/x-www-form-urlencoded", body: []byte("b64cert=%25%25%25")}, "Unrecognised input"},
 		{"invalid PEM", mtcHTTPRequest{path: "/lintcert", profile: "mtc_subscriber", contentType: "application/x-www-form-urlencoded", body: []byte(url.Values{"b64cert": {"-----BEGIN CERTIFICATE-----\n%%%\n-----END CERTIFICATE-----\n"}}.Encode())}, "Unrecognised input"},
+		{"TBS PEM on certificate endpoint", mtcHTTPRequest{path: "/lintcert", profile: "mtc_subscriber", contentType: "application/x-www-form-urlencoded", body: []byte(url.Values{"b64cert": {string(tbsPEM)}}.Encode())}, "Unrecognised input"},
 		{"malformed outer DER", mtcHTTPRequest{path: "/lintcert", profile: "mtc_subscriber", contentType: "application/pkix-cert", body: []byte{0x30, 0x01, 0x00}}, "Unrecognised input"},
 		{"unparseable TBS", mtcHTTPRequest{path: "/linttbscert", profile: "mtc_subscriber", contentType: "application/octet-stream", body: []byte{0x30, 0x00}}, "Unrecognised input"},
 	}

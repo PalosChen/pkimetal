@@ -20,23 +20,26 @@ type tbsCertificatePartial struct {
 }
 
 func (ri *RequestInfo) parseCertificateInput() (cert *x509.Certificate, err error) {
-	// Decode the PEM or Base64 certificate input.
 	if ri.b64Input == nil {
-		err = fmt.Errorf("no certificate provided")
-		return
-	} else if ri.decodedInput, err = utils.DecodePEMOrBase64(ri.b64Input, "CERTIFICATE"); err != nil {
-		return
+		return nil, fmt.Errorf("no certificate provided")
 	}
 
 	var inputKind mtc.InputKind
 	switch ri.endpoint {
 	case ENDPOINT_LINTTBSCERT:
 		inputKind = mtc.InputTBSCertificate
+		ri.decodedInput, err = utils.DecodePEMOrBase64(ri.b64Input, "TBS CERTIFICATE")
+		if err != nil {
+			ri.decodedInput, err = utils.DecodePEMOrBase64(ri.b64Input, "CERTIFICATE")
+		}
 	case ENDPOINT_LINTCERT:
 		inputKind = mtc.InputCertificate
+		ri.decodedInput, err = utils.DecodePEMOrBase64(ri.b64Input, "CERTIFICATE")
 	default:
-		err = fmt.Errorf("invalid endpoint for certificate input")
-		return
+		return nil, fmt.Errorf("invalid endpoint for certificate input")
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	processed, cert, artifact, err := parseCertificateBytes(ri.decodedInput, inputKind, x509.ParseCertificate)
