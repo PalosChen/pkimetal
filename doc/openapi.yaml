@@ -205,18 +205,18 @@ components:
       content:
         application/x-www-form-urlencoded:
           schema:
-            $ref: '#/components/schemas/LintRequest'
+            $ref: '#/components/schemas/CertificateLintRequest'
           examples:
             mtcCA:
               summary: Explicit MTC CA profile
               value:
-                b64input: BASE64_OR_PEM_CERTIFICATE_FROM_THE_CALLER
+                b64cert: BASE64_OR_PEM_CERTIFICATE_FROM_THE_CALLER
                 profile: mtc_ca
                 format: json
             cqrpMTCSubscriber:
               summary: Explicit CQRP MTC subscriber profile
               value:
-                b64input: BASE64_OR_PEM_CERTIFICATE_FROM_THE_CALLER
+                b64cert: BASE64_OR_PEM_CERTIFICATE_FROM_THE_CALLER
                 profile: cqrp_mtc_subscriber
                 format: json
         application/pkix-cert:
@@ -227,7 +227,6 @@ components:
             completeCertificate:
               summary: Caller-provided complete DER Certificate
               description: Binary body; no certificate bytes are fabricated here.
-              value: CALLER_PROVIDED_DER_CERTIFICATE
 
     TBSCertificateLintRequestBody:
       description: >-
@@ -237,18 +236,18 @@ components:
       content:
         application/x-www-form-urlencoded:
           schema:
-            $ref: '#/components/schemas/LintRequest'
+            $ref: '#/components/schemas/TBSCertificateLintRequest'
           examples:
             mtcSubscriber:
               summary: Explicit MTC subscriber profile
               value:
-                b64input: BASE64_OR_PEM_TBS_CERTIFICATE_FROM_THE_CALLER
+                b64tbscert: BASE64_OR_PEM_TBS_CERTIFICATE_FROM_THE_CALLER
                 profile: mtc_subscriber
                 format: json
             cqrpMTCCA:
               summary: Explicit CQRP MTC CA profile
               value:
-                b64input: BASE64_OR_PEM_TBS_CERTIFICATE_FROM_THE_CALLER
+                b64tbscert: BASE64_OR_PEM_TBS_CERTIFICATE_FROM_THE_CALLER
                 profile: cqrp_mtc_ca
                 format: json
         application/octet-stream:
@@ -259,7 +258,6 @@ components:
             tbsCertificate:
               summary: Caller-provided DER TBSCertificate
               description: Binary body; no certificate bytes are fabricated here.
-              value: CALLER_PROVIDED_DER_TBS_CERTIFICATE
 
   responses:
     BadRequest:
@@ -330,7 +328,7 @@ components:
               summary: A malformed proof is an HTTP 200 fatal lint finding
               value:
                 - Linter: mtclint
-                  Finding: MTCProof is malformed
+                  Finding: "[draft-ietf-plants-merkle-tree-certs-05 §6.2] MTCProof is malformed"
                   Field: signatureValue
                   Code: f_mtc_proof_malformed
                   Severity: fatal
@@ -364,16 +362,9 @@ components:
       description: The response format
       default: json
 
-    LintRequest:
+    LintRequestOptions:
       type: object
-      required:
-        - b64input
       properties:
-        b64input:
-          type: string
-          description: >-
-            The caller's Base64 or PEM-encoded input. Endpoint-specific aliases
-            such as b64cert and b64tbscert are also accepted.
         format:
           $ref: '#/components/schemas/ResponseFormat'
         profile:
@@ -385,6 +376,51 @@ components:
           default: autodetect
         severity:
           $ref: '#/components/schemas/FindingSeverity'
+
+    LintRequest:
+      allOf:
+        - $ref: '#/components/schemas/LintRequestOptions'
+        - type: object
+          required:
+            - b64input
+          properties:
+            b64input:
+              type: string
+              description: The caller's Base64 or PEM-encoded input.
+
+    CertificateLintRequest:
+      allOf:
+        - $ref: '#/components/schemas/LintRequestOptions'
+        - type: object
+          properties:
+            b64input:
+              type: string
+              description: The caller's Base64 or PEM-encoded complete Certificate.
+            b64cert:
+              type: string
+              description: Endpoint-specific alias for b64input; takes precedence when both are present.
+          anyOf:
+            - required:
+                - b64input
+            - required:
+                - b64cert
+
+    TBSCertificateLintRequest:
+      allOf:
+        - $ref: '#/components/schemas/LintRequestOptions'
+        - type: object
+          properties:
+            b64input:
+              type: string
+              description: The caller's Base64 or PEM-encoded TBSCertificate.
+            b64tbscert:
+              type: string
+              description: Endpoint-specific alias for b64input; takes precedence when both are present.
+          anyOf:
+            - required:
+                - b64input
+            - required:
+                - b64tbscert
 
     LintResponse:
       type: array

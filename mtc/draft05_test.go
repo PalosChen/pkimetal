@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/pkimetal/pkimetal/internal/mtctest"
+	"go.yaml.in/yaml/v3"
 )
 
 type findingExpectation struct {
@@ -69,10 +70,6 @@ func TestRuleCoverageDocument(t *testing.T) {
 		t.Fatalf("read rule coverage document: %v", err)
 	}
 	body := string(document)
-	panicMetadata := "| `b_mtc_rule_panic` | inherited from panicking rule (`Rule.Source`) | inherited from panicking rule (`Rule.Section`) |"
-	if !strings.Contains(body, panicMetadata) {
-		t.Errorf("panic coverage row does not document inherited source and section metadata")
-	}
 	codes := append(draftCodes, cqrpCodes...)
 	codes = append(codes, "e_mtc_profile_artifact_mismatch", "b_mtc_rule_panic")
 	for _, code := range codes {
@@ -81,30 +78,233 @@ func TestRuleCoverageDocument(t *testing.T) {
 		}
 	}
 
-	validStatuses := map[string]bool{
-		"implemented":           true,
-		"delegated":             true,
-		"not applicable":        true,
-		"not locally decidable": true,
+	want := expectedCoverageRecords(t)
+	got := parseCoverageRecords(t, body)
+	if !reflect.DeepEqual(got, want) {
+		for code, wantRecord := range want {
+			if gotRecord, ok := got[code]; !ok {
+				t.Errorf("coverage matrix lacks %q", code)
+			} else if !reflect.DeepEqual(gotRecord, wantRecord) {
+				t.Errorf("coverage metadata for %q = %#v, want %#v", code, gotRecord, wantRecord)
+			}
+		}
+		for code := range got {
+			if _, ok := want[code]; !ok {
+				t.Errorf("coverage matrix has unexpected code %q", code)
+			}
+		}
 	}
+	assertRequirementCoverageRows(t, body)
+}
+
+type coverageRecord struct {
+	Source             string
+	Section            string
+	ArtifactProfile    string
+	InputApplicability string
+	Fields             string
+	Severity           string
+	Status             string
+}
+
+func expectedCoverageRecords(t *testing.T) map[string]coverageRecord {
+	t.Helper()
+	fields := expectationFields(t, draft05Expectations, cqrp020Expectations)
+	records := make(map[string]coverageRecord, len(draft05Rules)+len(cqrp020Rules)+2)
+	addRules := func(rules []Rule, cqrp bool) {
+		for _, rule := range rules {
+			if fields[rule.Code] == "" {
+				t.Fatalf("expectation maps lack fields for %q", rule.Code)
+			}
+			artifactProfile := "Subscriber / MTC and CQRP subscriber"
+			if cqrp {
+				artifactProfile = "Subscriber / CQRP subscriber"
+			}
+			if reflect.DeepEqual(rule.Kinds, caKinds) {
+				artifactProfile = "CA / MTC and CQRP CA"
+				if cqrp {
+					artifactProfile = "CA / CQRP CA"
+				}
+			}
+			if strings.HasPrefix(rule.Code, "e_rfc9925_") || strings.HasPrefix(rule.Code, "w_rfc9925_") {
+				artifactProfile = "Unsigned CA / MTC and CQRP CA"
+			}
+			inputApplicability := "Certificate only"
+			if reflect.DeepEqual(rule.InputKinds, bothInputKinds) {
+				inputApplicability = "Certificate and TBS"
+			}
+			records[rule.Code] = coverageRecord{
+				Source:             rule.Source,
+				Section:            rule.Section,
+				ArtifactProfile:    artifactProfile,
+				InputApplicability: inputApplicability,
+				Fields:             fields[rule.Code],
+				Severity:           severityFromCode(t, rule.Code),
+				Status:             "implemented",
+			}
+		}
+	}
+	addRules(draft05Rules, false)
+	addRules(cqrp020Rules, true)
+	records["e_mtc_profile_artifact_mismatch"] = coverageRecord{
+		Source:             "pkimetal profile dispatch",
+		Section:            "Explicit MTC profile selection",
+		ArtifactProfile:    "CA or subscriber / all four MTC profiles",
+		InputApplicability: "Certificate and TBS",
+		Fields:             "profile",
+		Severity:           "error",
+		Status:             "implemented",
+	}
+	records["b_mtc_rule_panic"] = coverageRecord{
+		Source:             "inherited from panicking rule (`Rule.Source`)",
+		Section:            "inherited from panicking rule (`Rule.Section`)",
+		ArtifactProfile:    "Any registered native MTC rule",
+		InputApplicability: "Rule applicability",
+		Fields:             "none",
+		Severity:           "bug",
+		Status:             "implemented",
+	}
+	return records
+}
+
+func expectationFields(t *testing.T, groups ...map[string]findingExpectation) map[string]string {
+	t.Helper()
+	fieldSets := make(map[string]map[string]bool)
+	for _, group := range groups {
+		for _, expectation := range group {
+			if fieldSets[expectation.Code] == nil {
+				fieldSets[expectation.Code] = make(map[string]bool)
+			}
+			fieldSets[expectation.Code][expectation.Field] = true
+			if got, want := severityName(expectation.Severity), severityFromCode(t, expectation.Code); got != want {
+				t.Fatalf("expectation severity for %q = %q, want code-derived %q", expectation.Code, got, want)
+			}
+		}
+	}
+	fields := make(map[string]string, len(fieldSets))
+	for code, set := range fieldSets {
+		var sorted []string
+		for field := range set {
+			sorted = append(sorted, field)
+		}
+		sort.Strings(sorted)
+		fields[code] = strings.Join(sorted, "; ")
+	}
+	return fields
+}
+
+func severityFromCode(t *testing.T, code string) string {
+	t.Helper()
+	if len(code) < 2 || code[1] != '_' {
+		t.Fatalf("stable finding code %q lacks a severity prefix", code)
+	}
+	switch code[0] {
+	case 'w':
+		return "warning"
+	case 'e':
+		return "error"
+	case 'b':
+		return "bug"
+	case 'f':
+		return "fatal"
+	default:
+		t.Fatalf("stable finding code %q has an unknown severity prefix", code)
+		return ""
+	}
+}
+
+func severityName(severity Severity) string {
+	switch severity {
+	case Warning:
+		return "warning"
+	case Error:
+		return "error"
+	case Bug:
+		return "bug"
+	case Fatal:
+		return "fatal"
+	default:
+		return ""
+	}
+}
+
+func parseCoverageRecords(t *testing.T, body string) map[string]coverageRecord {
+	t.Helper()
+	records := make(map[string]coverageRecord)
 	for lineNumber, line := range strings.Split(body, "\n") {
 		if !strings.HasPrefix(line, "| `") {
 			continue
 		}
 		columns := strings.Split(line, "|")
-		if len(columns) != 9 {
-			t.Errorf("coverage row %d has %d columns, want 7: %s", lineNumber+1, len(columns)-2, line)
+		if len(columns) != 10 {
+			t.Errorf("stable coverage row %d has %d columns, want 8: %s", lineNumber+1, len(columns)-2, line)
 			continue
 		}
-		for _, column := range []int{2, 3, 4, 5, 6} {
+		code := strings.Trim(strings.TrimSpace(columns[1]), "`")
+		if _, exists := records[code]; exists {
+			t.Errorf("stable coverage row %d duplicates %q", lineNumber+1, code)
+			continue
+		}
+		records[code] = coverageRecord{
+			Source:             strings.TrimSpace(columns[2]),
+			Section:            strings.TrimSpace(columns[3]),
+			ArtifactProfile:    strings.TrimSpace(columns[4]),
+			InputApplicability: strings.TrimSpace(columns[5]),
+			Fields:             normalizeFieldSet(strings.TrimSpace(columns[6])),
+			Severity:           strings.TrimSpace(columns[7]),
+			Status:             strings.TrimSpace(columns[8]),
+		}
+	}
+	return records
+}
+
+func normalizeFieldSet(fields string) string {
+	if fields == "none" {
+		return fields
+	}
+	parts := strings.Split(fields, ";")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, "; ")
+}
+
+func assertRequirementCoverageRows(t *testing.T, body string) {
+	t.Helper()
+	const heading = "## Requirement-level coverage without finding codes"
+	start := strings.Index(body, heading)
+	if start < 0 {
+		t.Fatal("coverage document lacks requirement-level coverage section")
+	}
+	seenStatuses := make(map[string]bool)
+	rows := 0
+	for lineNumber, line := range strings.Split(body[start:], "\n") {
+		if !strings.HasPrefix(line, "|") || strings.HasPrefix(line, "| Requirement ") || strings.HasPrefix(line, "| ---") {
+			continue
+		}
+		columns := strings.Split(line, "|")
+		if len(columns) != 10 {
+			t.Errorf("requirement coverage row %d has %d columns, want 8: %s", lineNumber+1, len(columns)-2, line)
+			continue
+		}
+		rows++
+		for column := 1; column <= 8; column++ {
 			if strings.TrimSpace(columns[column]) == "" {
-				t.Errorf("coverage row %d has blank required metadata: %s", lineNumber+1, line)
+				t.Errorf("requirement coverage row %d has blank column %d", lineNumber+1, column)
 			}
 		}
-		status := strings.TrimSpace(columns[7])
-		if !validStatuses[status] {
-			t.Errorf("coverage row %d has invalid status %q", lineNumber+1, status)
+		if field := strings.TrimSpace(columns[6]); field != "n/a" {
+			t.Errorf("requirement coverage row %d has Field(s) %q, want n/a", lineNumber+1, field)
 		}
+		seenStatuses[strings.TrimSpace(columns[8])] = true
+	}
+	if rows == 0 {
+		t.Error("requirement coverage table is empty")
+	}
+	wantStatuses := map[string]bool{"delegated": true, "not applicable": true, "not locally decidable": true}
+	if !reflect.DeepEqual(seenStatuses, wantStatuses) {
+		t.Errorf("requirement coverage statuses = %v, want %v", seenStatuses, wantStatuses)
 	}
 }
 
@@ -119,19 +319,19 @@ func TestExperimentalDeploymentDocumentation(t *testing.T) {
 	}
 
 	readme := read("../README.md")
-	for _, section := range []string{"Experimental MTC fork", "## Docker containers", "## Public instances"} {
-		start := strings.Index(readme, section)
-		if start < 0 {
-			t.Errorf("README lacks %q section", section)
-			continue
-		}
-		end := strings.Index(readme[start+len(section):], "\n## ")
-		body := readme[start:]
-		if end >= 0 {
-			body = readme[start : start+len(section)+end]
-		}
-		if !strings.Contains(body, "do not expose these fork-only MTC/CQRP features") {
-			t.Errorf("README %q section lacks fork deployment disclaimer", section)
+	for _, required := range []string{
+		"public services at\n> `pkimet.al` and `dev.pkimet.al`",
+		"build and deploy this fork separately",
+		"https://github.com/orgs/pkimetal/packages?repo_name=pkimetal",
+		"upstream GHCR images",
+		"separately built image from this fork",
+		"https://pkimet.al/",
+		"https://dev.pkimet.al/",
+		"upstream public instances",
+		"must not be used as MTC or CQRP endpoints",
+	} {
+		if !strings.Contains(readme, required) {
+			t.Errorf("README lacks deployment boundary %q", required)
 		}
 	}
 
@@ -143,6 +343,121 @@ func TestExperimentalDeploymentDocumentation(t *testing.T) {
 	}
 	if !strings.Contains(openapi, "description: Experimental local fork deployment") {
 		t.Error("OpenAPI lacks an experimental local deployment server description")
+	}
+}
+
+type openAPISchema struct {
+	Ref        string                   `yaml:"$ref"`
+	Type       string                   `yaml:"type"`
+	Required   []string                 `yaml:"required"`
+	Properties map[string]openAPISchema `yaml:"properties"`
+	AllOf      []openAPISchema          `yaml:"allOf"`
+	AnyOf      []openAPISchema          `yaml:"anyOf"`
+	OneOf      []openAPISchema          `yaml:"oneOf"`
+}
+
+type openAPIExample struct {
+	Value any `yaml:"value"`
+}
+
+type openAPIMediaType struct {
+	Schema   openAPISchema             `yaml:"schema"`
+	Examples map[string]openAPIExample `yaml:"examples"`
+}
+
+type openAPIRequestBody struct {
+	Content map[string]openAPIMediaType `yaml:"content"`
+}
+
+func TestOpenAPIMTCCertificateRequests(t *testing.T) {
+	contents, err := os.ReadFile("../doc/openapi.yaml")
+	if err != nil {
+		t.Fatalf("read OpenAPI document: %v", err)
+	}
+	var spec struct {
+		Components struct {
+			RequestBodies map[string]openAPIRequestBody `yaml:"requestBodies"`
+			Schemas       map[string]openAPISchema      `yaml:"schemas"`
+		} `yaml:"components"`
+	}
+	if err := yaml.Unmarshal(contents, &spec); err != nil {
+		t.Fatalf("parse OpenAPI document: %v", err)
+	}
+
+	tests := []struct {
+		requestBody string
+		schema      string
+		alias       string
+		binaryMedia string
+	}{
+		{"CertificateLintRequestBody", "CertificateLintRequest", "b64cert", "application/pkix-cert"},
+		{"TBSCertificateLintRequestBody", "TBSCertificateLintRequest", "b64tbscert", "application/octet-stream"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.schema, func(t *testing.T) {
+			form := spec.Components.RequestBodies[tc.requestBody].Content["application/x-www-form-urlencoded"]
+			if got, want := form.Schema.Ref, "#/components/schemas/"+tc.schema; got != want {
+				t.Errorf("form schema ref = %q, want %q", got, want)
+			}
+			schema := spec.Components.Schemas[tc.schema]
+			if len(schema.AllOf) != 2 || schema.AllOf[0].Ref != "#/components/schemas/LintRequestOptions" {
+				t.Fatalf("%s common options composition = %#v", tc.schema, schema.AllOf)
+			}
+			input := schema.AllOf[1]
+			for _, property := range []string{"b64input", tc.alias} {
+				if _, ok := input.Properties[property]; !ok {
+					t.Errorf("%s lacks property %q", tc.schema, property)
+				}
+			}
+			if len(input.AnyOf) != 2 || len(input.OneOf) != 0 {
+				t.Errorf("%s input choice uses anyOf=%#v oneOf=%#v", tc.schema, input.AnyOf, input.OneOf)
+			} else {
+				gotRequired := []string{strings.Join(input.AnyOf[0].Required, ","), strings.Join(input.AnyOf[1].Required, ",")}
+				sort.Strings(gotRequired)
+				wantRequired := []string{"b64input", tc.alias}
+				sort.Strings(wantRequired)
+				if !reflect.DeepEqual(gotRequired, wantRequired) {
+					t.Errorf("%s anyOf requirements = %v, want %v", tc.schema, gotRequired, wantRequired)
+				}
+			}
+			if len(form.Examples) == 0 {
+				t.Errorf("%s form media type has no alias examples", tc.requestBody)
+			}
+			for name, example := range form.Examples {
+				value, ok := example.Value.(map[string]any)
+				if !ok {
+					t.Errorf("form example %q value = %#v, want object", name, example.Value)
+					continue
+				}
+				if _, ok := value[tc.alias]; !ok {
+					t.Errorf("form example %q lacks endpoint alias %q", name, tc.alias)
+				}
+				if _, ok := value["b64input"]; ok {
+					t.Errorf("form example %q should demonstrate alias rather than b64input", name)
+				}
+			}
+			binaryExamples := spec.Components.RequestBodies[tc.requestBody].Content[tc.binaryMedia].Examples
+			if len(binaryExamples) == 0 {
+				t.Errorf("%s binary media type has no descriptive example", tc.requestBody)
+			}
+			for name, example := range binaryExamples {
+				if example.Value != nil {
+					t.Errorf("binary example %q fabricates value %#v", name, example.Value)
+				}
+			}
+		})
+	}
+
+	const exactFinding = "[draft-ietf-plants-merkle-tree-certs-05 §6.2] MTCProof is malformed"
+	if !strings.Contains(string(contents), `Finding: "`+exactFinding+`"`) {
+		t.Errorf("OpenAPI lacks exact malformed-proof wire finding %q", exactFinding)
+	}
+	rest, err := os.ReadFile("../doc/REST_API.md")
+	if err != nil {
+		t.Fatalf("read REST API document: %v", err)
+	}
+	if !strings.Contains(string(rest), `"Finding": "`+exactFinding+`"`) {
+		t.Errorf("REST API lacks exact malformed-proof wire finding %q", exactFinding)
 	}
 }
 

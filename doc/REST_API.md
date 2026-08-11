@@ -171,7 +171,7 @@ request parsing failure.
   },
   {
     "Linter": "mtclint",
-    "Finding": "MTCProof is malformed",
+    "Finding": "[draft-ietf-plants-merkle-tree-certs-05 §6.2] MTCProof is malformed",
     "Field": "signatureValue",
     "Code": "f_mtc_proof_malformed",
     "Severity": "fatal"

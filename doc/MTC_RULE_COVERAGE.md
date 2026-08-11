@@ -52,91 +52,93 @@ issuerAltName.
 
 Every implemented stable finding code appears exactly once below. "Artifact / profile"
 describes the profile context in which the rule is registered, not a claim that
-every input will trigger the finding.
+every input will trigger the finding. The Source column records exact finding
+wire metadata; CQRP rows therefore use `CQRP v0.2.0`, while the implementation
+baseline remains the user-supplied local draft described above.
 
 ### Draft-05 and conditional RFC 9925
 
-| Code | Source | Section | Artifact / profile | Input applicability | Severity | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| `e_mtc_ca_basic_constraints_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | error | implemented |
-| `e_mtc_ca_basic_constraints_not_ca` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | error | implemented |
-| `e_mtc_ca_extension_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | error | implemented |
-| `e_mtc_ca_extension_not_critical` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | error | implemented |
-| `e_mtc_ca_key_cert_sign_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | error | implemented |
-| `e_mtc_ca_key_usage_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | error | implemented |
-| `e_mtc_ca_serial_range_invalid` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | error | implemented |
-| `e_mtc_ca_subject_not_ca_id` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | error | implemented |
-| `e_mtc_cert_signature_algorithm_mismatch` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | error | implemented |
-| `e_mtc_proof_cosigner_duplicate` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | error | implemented |
-| `e_mtc_proof_cosigner_id_empty` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | error | implemented |
-| `e_mtc_proof_cosigner_order` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | error | implemented |
-| `e_mtc_proof_extensions_duplicate` | draft-ietf-plants-merkle-tree-certs-05 | 5.2.1 | Subscriber / MTC and CQRP subscriber | Certificate only | error | implemented |
-| `e_mtc_proof_extensions_order` | draft-ietf-plants-merkle-tree-certs-05 | 5.2.1 | Subscriber / MTC and CQRP subscriber | Certificate only | error | implemented |
-| `e_mtc_proof_index_outside_range` | draft-ietf-plants-merkle-tree-certs-05 | 4.3.2 | Subscriber / MTC and CQRP subscriber | Certificate only | error | implemented |
-| `e_mtc_proof_range_invalid` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | error | implemented |
-| `e_mtc_proof_subtree_invalid` | draft-ietf-plants-merkle-tree-certs-05 | 4.1 | Subscriber / MTC and CQRP subscriber | Certificate only | error | implemented |
-| `e_mtc_serial_log_number_zero` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_mtc_serial_non_positive` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_mtc_serial_too_large` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_mtc_signature_algorithm_oid` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_mtc_signature_algorithm_parameters_present` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_mtc_signature_value_unused_bits` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | error | implemented |
-| `e_mtc_subscriber_issuer_not_ca_id` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_rfc9925_unsigned_algorithm_mismatch` | RFC 9925 | 3.1 | Unsigned CA / MTC and CQRP CA | Certificate only | error | implemented |
-| `e_rfc9925_unsigned_issuer_unique_id_present` | RFC 9925 | 3.2 | Unsigned CA / MTC and CQRP CA | Certificate and TBS | error | implemented |
-| `e_rfc9925_unsigned_parameters_present` | RFC 9925 | 3.1 | Unsigned CA / MTC and CQRP CA | Certificate and TBS | error | implemented |
-| `e_rfc9925_unsigned_signature_not_empty` | RFC 9925 | 3.1 | Unsigned CA / MTC and CQRP CA | Certificate only | error | implemented |
-| `f_mtc_ca_extension_malformed` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | fatal | implemented |
-| `f_mtc_proof_malformed` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | fatal | implemented |
-| `w_mtc_ca_self_issued` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | warning | implemented |
-| `w_mtc_ca_ski_not_ca_id` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | warning | implemented |
-| `w_rfc9925_unsigned_authority_key_identifier_present` | RFC 9925 | 3.3 | Unsigned CA / MTC and CQRP CA | Certificate and TBS | warning | implemented |
-| `w_rfc9925_unsigned_issuer_alternative_name_present` | RFC 9925 | 3.3 | Unsigned CA / MTC and CQRP CA | Certificate and TBS | warning | implemented |
+| Code | Source | Section | Artifact / profile | Input applicability | Field(s) | Severity | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `e_mtc_ca_basic_constraints_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.basicConstraints | error | implemented |
+| `e_mtc_ca_basic_constraints_not_ca` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.basicConstraints | error | implemented |
+| `e_mtc_ca_extension_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions | error | implemented |
+| `e_mtc_ca_extension_not_critical` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions | error | implemented |
+| `e_mtc_ca_key_cert_sign_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.keyUsage | error | implemented |
+| `e_mtc_ca_key_usage_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.keyUsage | error | implemented |
+| `e_mtc_ca_serial_range_invalid` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority | error | implemented |
+| `e_mtc_ca_subject_not_ca_id` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.subject | error | implemented |
+| `e_mtc_cert_signature_algorithm_mismatch` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureAlgorithm | error | implemented |
+| `e_mtc_proof_cosigner_duplicate` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.signatures.cosigner_id | error | implemented |
+| `e_mtc_proof_cosigner_id_empty` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.signatures.cosigner_id | error | implemented |
+| `e_mtc_proof_cosigner_order` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.signatures.cosigner_id | error | implemented |
+| `e_mtc_proof_extensions_duplicate` | draft-ietf-plants-merkle-tree-certs-05 | 5.2.1 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.extensions | error | implemented |
+| `e_mtc_proof_extensions_order` | draft-ietf-plants-merkle-tree-certs-05 | 5.2.1 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.extensions | error | implemented |
+| `e_mtc_proof_index_outside_range` | draft-ietf-plants-merkle-tree-certs-05 | 4.3.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.start,end | error | implemented |
+| `e_mtc_proof_range_invalid` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.start,end | error | implemented |
+| `e_mtc_proof_subtree_invalid` | draft-ietf-plants-merkle-tree-certs-05 | 4.1 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.start,end | error | implemented |
+| `e_mtc_serial_log_number_zero` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | tbsCertificate.serialNumber | error | implemented |
+| `e_mtc_serial_non_positive` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | tbsCertificate.serialNumber | error | implemented |
+| `e_mtc_serial_too_large` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | tbsCertificate.serialNumber | error | implemented |
+| `e_mtc_signature_algorithm_oid` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | signatureAlgorithm; tbsCertificate.signature | error | implemented |
+| `e_mtc_signature_algorithm_parameters_present` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | signatureAlgorithm.parameters; tbsCertificate.signature.parameters | error | implemented |
+| `e_mtc_signature_value_unused_bits` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue | error | implemented |
+| `e_mtc_subscriber_issuer_not_ca_id` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate and TBS | tbsCertificate.issuer | error | implemented |
+| `e_rfc9925_unsigned_algorithm_mismatch` | RFC 9925 | 3.1 | Unsigned CA / MTC and CQRP CA | Certificate only | signatureAlgorithm | error | implemented |
+| `e_rfc9925_unsigned_issuer_unique_id_present` | RFC 9925 | 3.2 | Unsigned CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.issuerUniqueID | error | implemented |
+| `e_rfc9925_unsigned_parameters_present` | RFC 9925 | 3.1 | Unsigned CA / MTC and CQRP CA | Certificate and TBS | signatureAlgorithm.parameters | error | implemented |
+| `e_rfc9925_unsigned_signature_not_empty` | RFC 9925 | 3.1 | Unsigned CA / MTC and CQRP CA | Certificate only | signatureValue | error | implemented |
+| `f_mtc_ca_extension_malformed` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions | fatal | implemented |
+| `f_mtc_proof_malformed` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue | fatal | implemented |
+| `w_mtc_ca_self_issued` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.issuer | warning | implemented |
+| `w_mtc_ca_ski_not_ca_id` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.subjectKeyIdentifier | warning | implemented |
+| `w_rfc9925_unsigned_authority_key_identifier_present` | RFC 9925 | 3.3 | Unsigned CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.authorityKeyIdentifier | warning | implemented |
+| `w_rfc9925_unsigned_issuer_alternative_name_present` | RFC 9925 | 3.3 | Unsigned CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | warning | implemented |
 
 ### CQRP v0.2.0 overlay
 
-| Code | Source | Section | Artifact / profile | Input applicability | Severity | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| `e_cqrp_ca_hash_mldsa` | CQRP v0.2.0 local draft | 4.5.1 | CA / CQRP CA | Certificate and TBS | error | implemented |
-| `e_cqrp_ca_key_usage_not_critical` | CQRP v0.2.0 local draft | 4.5.1 | CA / CQRP CA | Certificate and TBS | error | implemented |
-| `e_cqrp_ca_spki_algorithm` | CQRP v0.2.0 local draft | 4.5.1 | CA / CQRP CA | Certificate and TBS | error | implemented |
-| `e_cqrp_ca_spki_encoding` | CQRP v0.2.0 local draft | 4.5.1 | CA / CQRP CA | Certificate and TBS | error | implemented |
-| `e_cqrp_ca_spki_parameters_present` | CQRP v0.2.0 local draft | 4.5.1 | CA / CQRP CA | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_dv_subject_not_empty` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_eku_critical` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_eku_missing` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_eku_only_server_auth` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_hash_mldsa` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_ian_critical` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_ian_form` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_mldsa_encoding` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_mldsa_parameters_present` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_policies_critical` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_policies_missing` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_policy_identifier` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_sct_present` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `e_cqrp_subscriber_standalone_cosignatures` | CQRP v0.2.0 local draft | 4.7 | Subscriber / CQRP subscriber | Certificate only | error | implemented |
-| `e_cqrp_subscriber_validity_too_long` | CQRP v0.2.0 local draft | 2.1 | Subscriber / CQRP subscriber | Certificate and TBS | error | implemented |
-| `w_cqrp_subscriber_ian_name_attributes` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | warning | implemented |
-| `w_cqrp_subscriber_policy_not_dv` | CQRP v0.2.0 local draft | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | warning | implemented |
+| Code | Source | Section | Artifact / profile | Input applicability | Field(s) | Severity | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `e_cqrp_ca_hash_mldsa` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm | error | implemented |
+| `e_cqrp_ca_key_usage_not_critical` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.keyUsage | error | implemented |
+| `e_cqrp_ca_spki_algorithm` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm | error | implemented |
+| `e_cqrp_ca_spki_encoding` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm; tbsCertificate.subjectPublicKeyInfo.subjectPublicKey | error | implemented |
+| `e_cqrp_ca_spki_parameters_present` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm.parameters | error | implemented |
+| `e_cqrp_subscriber_dv_subject_not_empty` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subject | error | implemented |
+| `e_cqrp_subscriber_eku_critical` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.extKeyUsage | error | implemented |
+| `e_cqrp_subscriber_eku_missing` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.extKeyUsage | error | implemented |
+| `e_cqrp_subscriber_eku_only_server_auth` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.extKeyUsage | error | implemented |
+| `e_cqrp_subscriber_hash_mldsa` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm | error | implemented |
+| `e_cqrp_subscriber_ian_critical` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | error | implemented |
+| `e_cqrp_subscriber_ian_form` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | error | implemented |
+| `e_cqrp_subscriber_mldsa_encoding` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm; tbsCertificate.subjectPublicKeyInfo.subjectPublicKey | error | implemented |
+| `e_cqrp_subscriber_mldsa_parameters_present` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm.parameters | error | implemented |
+| `e_cqrp_subscriber_policies_critical` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | error | implemented |
+| `e_cqrp_subscriber_policies_missing` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | error | implemented |
+| `e_cqrp_subscriber_policy_identifier` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | error | implemented |
+| `e_cqrp_subscriber_sct_present` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.signedCertificateTimestampList | error | implemented |
+| `e_cqrp_subscriber_standalone_cosignatures` | CQRP v0.2.0 | 4.7 | Subscriber / CQRP subscriber | Certificate only | signatureValue.signatures | error | implemented |
+| `e_cqrp_subscriber_validity_too_long` | CQRP v0.2.0 | 2.1 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.validity | error | implemented |
+| `w_cqrp_subscriber_ian_name_attributes` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | warning | implemented |
+| `w_cqrp_subscriber_policy_not_dv` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | warning | implemented |
 
 ### Dispatcher and rule-runner findings
 
-| Code | Source | Section | Artifact / profile | Input applicability | Severity | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| `e_mtc_profile_artifact_mismatch` | pkimetal profile dispatch | Explicit MTC profile selection | CA or subscriber / all four MTC profiles | Certificate and TBS | error | implemented |
-| `b_mtc_rule_panic` | inherited from panicking rule (`Rule.Source`) | inherited from panicking rule (`Rule.Section`) | Any registered native MTC rule | Rule applicability | bug | implemented |
+| Code | Source | Section | Artifact / profile | Input applicability | Field(s) | Severity | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `e_mtc_profile_artifact_mismatch` | pkimetal profile dispatch | Explicit MTC profile selection | CA or subscriber / all four MTC profiles | Certificate and TBS | profile | error | implemented |
+| `b_mtc_rule_panic` | inherited from panicking rule (`Rule.Source`) | inherited from panicking rule (`Rule.Section`) | Any registered native MTC rule | Rule applicability | none | bug | implemented |
 
 ## Requirement-level coverage without finding codes
 
 These rows describe ownership or limits and deliberately do not invent finding
 codes.
 
-| Requirement | Source | Section | Artifact / profile | Input applicability | Severity | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| Compatible RFC 5280 and TLS certificate rules | RFC 5280 and TLS Baseline Requirements | Sections not explicitly overridden | All MTC profiles | When a compatible linter can parse the artifact | linter-defined | delegated |
-| Outer Certificate and MTCProof checks on TBS input | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | All MTC TBS profiles | TBS lacks outer and proof fields | none | not applicable |
-| Inclusion root, proof hash, and cosignature cryptographic validation | draft-ietf-plants-merkle-tree-certs-05 | 4 and 6 | Subscriber / MTC and CQRP subscriber | Requires Merkle context and trusted keys | none | not locally decidable |
-| External log-entry comparison and signer/operator role independence | draft-ietf-plants-merkle-tree-certs-05 and CQRP v0.2.0 local draft | Operational requirements | All MTC profiles | Requires external records and roles | none | not locally decidable |
-| Chrome registry policy | CQRP v0.2.0 local draft | Registry-dependent requirements | CQRP profiles | Requires an online registry query | none | not locally decidable |
-| Conditional CA cRLSign behavior | CQRP v0.2.0 local draft | 4.5.1 | CA / CQRP CA | Requires external CA role and CRL behavior | none | not locally decidable |
+| Requirement | Source | Section | Artifact / profile | Input applicability | Field(s) | Severity | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Compatible RFC 5280 and TLS certificate rules | RFC 5280 and TLS Baseline Requirements | Sections not explicitly overridden | All MTC profiles | When a compatible linter can parse the artifact | n/a | linter-defined | delegated |
+| Outer Certificate and MTCProof checks on TBS input | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | All MTC TBS profiles | TBS lacks outer and proof fields | n/a | none | not applicable |
+| Inclusion root, proof hash, and cosignature cryptographic validation | draft-ietf-plants-merkle-tree-certs-05 | 4 and 6 | Subscriber / MTC and CQRP subscriber | Requires Merkle context and trusted keys | n/a | none | not locally decidable |
+| External log-entry comparison and signer/operator role independence | draft-ietf-plants-merkle-tree-certs-05 and CQRP v0.2.0 local draft | Operational requirements | All MTC profiles | Requires external records and roles | n/a | none | not locally decidable |
+| Chrome registry policy | CQRP v0.2.0 local draft | Registry-dependent requirements | CQRP profiles | Requires an online registry query | n/a | none | not locally decidable |
+| Conditional CA cRLSign behavior | CQRP v0.2.0 local draft | 4.5.1 | CA / CQRP CA | Requires external CA role and CRL behavior | n/a | none | not locally decidable |
