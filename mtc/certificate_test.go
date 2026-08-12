@@ -368,6 +368,15 @@ func TestParseCAIDNameEnforcesBinaryLengthLimit(t *testing.T) {
 		t.Fatalf("CA ID length = %d, want 255", len(got))
 	}
 
+	maximumText := strings.TrimSuffix(strings.Repeat("127.", 255), ".")
+	got, err = mtc.ParseCAIDName(nameWithCAIDValue(utf8StringDER(maximumText)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 255 || !bytes.Equal(got, bytes.Repeat([]byte{0x7f}, 255)) {
+		t.Fatalf("maximal-text CA ID = %x, want 255 one-byte arcs", got)
+	}
+
 	tooLong := strings.TrimSuffix(strings.Repeat("1.", 256), ".")
 	if _, err := mtc.ParseCAIDName(nameWithCAIDValue(utf8StringDER(tooLong))); err == nil {
 		t.Fatal("accepted a 256-byte binary CA ID")
