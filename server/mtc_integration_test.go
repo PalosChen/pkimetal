@@ -555,47 +555,63 @@ func testMTCLegacyParseErrorRouting(t *testing.T, h *mtcHTTPTestServer) {
 }
 
 func testRecognizedMTCLegacyParseErrorRouting(t *testing.T, h *mtcHTTPTestServer) {
-	template := mtctest.ValidSubscriberTemplate()
-	template.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDRSAEncryption, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}
-	certificate := mtctest.Certificate(template)
-
-	artifact, err := mtc.Parse(certificate, mtc.InputCertificate)
-	if err != nil || artifact.Kind != mtc.ArtifactSubscriber {
-		t.Fatalf("native parse = %#v, %v; want subscriber artifact", artifact, err)
-	}
-	if cert, err := x509.ParseCertificate(certificate); err == nil || cert != nil {
-		t.Fatalf("legacy parse = %#v, %v; want rejection", cert, err)
-	}
-
+	subscriber := mtctest.ValidSubscriberTemplate()
+	ca := mtctest.ValidCATemplate()
 	for _, tc := range []struct {
-		name    string
-		profile string
+		name            string
+		template        mtctest.Template
+		kind            mtc.ArtifactKind
+		explicitProfile string
 	}{
-		{"explicit legacy", "rfc5280_leaf"},
-		{"autodetect", "autodetect"},
+		{"subscriber", subscriber, mtc.ArtifactSubscriber, "mtc_subscriber"},
+		{"CA", ca, mtc.ArtifactCA, "mtc_ca"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			template := tc.template
+			template.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDRSAEncryption, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}
+			certificate := mtctest.Certificate(template)
+
+			artifact, err := mtc.Parse(certificate, mtc.InputCertificate)
+			if err != nil || artifact.Kind != tc.kind {
+				t.Fatalf("native parse = %#v, %v; want artifact kind %v", artifact, err, tc.kind)
+			}
+			if cert, err := x509.ParseCertificate(certificate); err == nil || cert != nil {
+				t.Fatalf("legacy parse = %#v, %v; want rejection", cert, err)
+			}
+
+			for _, profile := range []string{"", "autodetect"} {
+				response := h.postJSON(t, mtcHTTPRequest{
+					path:        "/lintcert",
+					profile:     profile,
+					contentType: "application/pkix-cert",
+					body:        certificate,
+				})
+				assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+				assertProfileMeta(t, response.results, tc.explicitProfile)
+				assertNoFatalOrBug(t, response.results)
+			}
+
 			response := h.postJSON(t, mtcHTTPRequest{
 				path:        "/lintcert",
-				profile:     tc.profile,
+				profile:     "rfc5280_leaf",
 				contentType: "application/pkix-cert",
 				body:        certificate,
 			})
 			assertStatusAndContentType(t, response, fasthttp.StatusBadRequest, "application/json; charset=UTF-8")
 			assertFindingTextContains(t, response.results, linter.PKIMETAL_NAME, "Unrecognised input")
 			assertNoProfileMeta(t, response.results)
+
+			response = h.postJSON(t, mtcHTTPRequest{
+				path:        "/lintcert",
+				profile:     tc.explicitProfile,
+				contentType: "application/pkix-cert",
+				body:        certificate,
+			})
+			assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+			assertProfileMeta(t, response.results, tc.explicitProfile)
+			assertNoFatalOrBug(t, response.results)
 		})
 	}
-
-	response := h.postJSON(t, mtcHTTPRequest{
-		path:        "/lintcert",
-		profile:     "mtc_subscriber",
-		contentType: "application/pkix-cert",
-		body:        certificate,
-	})
-	assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
-	assertProfileMeta(t, response.results, "mtc_subscriber")
-	assertNoFatalOrBug(t, response.results)
 }
 
 func testMTCTBSExclusions(t *testing.T, h *mtcHTTPTestServer) {

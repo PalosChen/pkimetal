@@ -96,6 +96,12 @@ func (ri *RequestInfo) deferredCertificateInputError(profileName string) error {
 	if ri.legacyCertErr == nil {
 		return nil
 	}
+	if (profileName == "" || profileName == linter.AllProfiles[linter.AUTODETECT].Name) && ri.mtcArtifact != nil {
+		switch ri.mtcArtifact.Kind {
+		case mtc.ArtifactCA, mtc.ArtifactSubscriber:
+			return nil
+		}
+	}
 	for profileID, profile := range linter.AllProfiles {
 		if profile.Name == profileName && linter.IsMTCProfile(profileID) {
 			return nil
