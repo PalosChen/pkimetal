@@ -68,12 +68,12 @@ func parseCertificateBytesWithLegacyError(decoded []byte, inputKind mtc.InputKin
 		legacyInput := append([]byte(nil), decoded...)
 		if inputKind == mtc.InputTBSCertificate {
 			if legacyInput, err = makeDummyCertificateBytes(decoded); err != nil {
-				return decoded, nil, artifact, nil, nil
+				return decoded, nil, artifact, err, nil
 			}
 		}
 		if legacyCert, parseErr := parseLegacyCertificate(legacyInput, parseLegacy); parseErr == nil {
 			cert = legacyCert
-		} else if artifact.Kind == mtc.ArtifactUnknown {
+		} else {
 			legacyErr = parseErr
 		}
 		return decoded, cert, artifact, legacyErr, nil

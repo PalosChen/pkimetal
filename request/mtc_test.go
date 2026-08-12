@@ -427,6 +427,21 @@ func TestMTCPOSTDispatchesAvailableLegacyCertificate(t *testing.T) {
 	}
 }
 
+func TestRecognizedMTCWithAvailableLegacyCertificateSupportsLegacyProfile(t *testing.T) {
+	decoded := legacyCompatibleMTCCA(t)
+	request := postAndCaptureMTCRequest(t, decoded, "rfc5280_leaf")
+
+	if request.ProfileId != linter.RFC5280_LEAF {
+		t.Fatalf("profile = %v, want %v", request.ProfileId, linter.RFC5280_LEAF)
+	}
+	if request.Cert == nil || request.MTCArtifact == nil || request.MTCArtifact.Kind != mtc.ArtifactCA {
+		t.Fatalf("dispatched certificate/artifact = %#v/%#v", request.Cert, request.MTCArtifact)
+	}
+	if !bytes.Equal(request.DecodedInput, decoded) || !bytes.Equal(request.Cert.Raw, decoded) {
+		t.Fatal("legacy profile dispatch did not retain the parsed MTC certificate")
+	}
+}
+
 func legacyCompatibleMTCCA(t *testing.T) []byte {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 1024)
