@@ -325,6 +325,44 @@ func assertRequirementCoverageRows(t *testing.T, body string) {
 	if !reflect.DeepEqual(seenStatuses, wantStatuses) {
 		t.Errorf("requirement coverage statuses = %v, want %v", seenStatuses, wantStatuses)
 	}
+	for _, requirement := range []string{
+		"Trust Anchor ID PEN ownership",
+		"mtc-tlog endpoints and checkpoint state",
+		"Chrome cosigner independence",
+	} {
+		if !strings.Contains(body[start:], "| "+requirement+" |") {
+			t.Errorf("requirement coverage lacks %q", requirement)
+		}
+	}
+}
+
+func TestMTCProfileDocumentationDescribesKindSpecificRules(t *testing.T) {
+	read := func(path string) string {
+		t.Helper()
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		return string(contents)
+	}
+	for path, required := range map[string][]string{
+		"../README.md": {
+			"CA and Subscriber profiles apply different rules",
+			"generic `mtc_ca` validates `mtc-tlog` only when its extension is present",
+			"`cqrp_mtc_ca` requires the `mtc-tlog` extension",
+		},
+		"../doc/openapi.yaml": {
+			"CA and Subscriber profiles apply different rule sets",
+			"cqrp_mtc_ca requires the certificate-local mtc-tlog extension",
+		},
+	} {
+		body := read(path)
+		for _, text := range required {
+			if !strings.Contains(body, text) {
+				t.Errorf("%s lacks %q", path, text)
+			}
+		}
+	}
 }
 
 func TestExperimentalDeploymentDocumentation(t *testing.T) {

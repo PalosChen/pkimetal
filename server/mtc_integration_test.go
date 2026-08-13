@@ -72,6 +72,7 @@ func TestMTCCertificateEndpoints(t *testing.T) {
 	t.Run("legacy parse error routing", func(t *testing.T) { testMTCLegacyParseErrorRouting(t, h) })
 	t.Run("recognized MTC legacy parse error routing", func(t *testing.T) { testRecognizedMTCLegacyParseErrorRouting(t, h) })
 	t.Run("TBS exclusions", func(t *testing.T) { testMTCTBSExclusions(t, h) })
+	t.Run("tlog and trust anchor rules", func(t *testing.T) { testMTCTlogAndTrustAnchorRules(t, h) })
 	t.Run("JSON schema", func(t *testing.T) { testMTCJSONSchema(t, h) })
 }
 
@@ -445,6 +446,69 @@ func testMTCMalformedProof(t *testing.T, h *mtcHTTPTestServer) {
 	assertFinding(t, response.results, "mtclint", "f_mtc_proof_malformed", "fatal")
 }
 
+func testMTCTlogAndTrustAnchorRules(t *testing.T, h *mtcHTTPTestServer) {
+	t.Run("generated CQRP CA is valid", func(t *testing.T) {
+		fixture, err := os.ReadFile("../mtc/testdata/cqrp-ca.pem")
+		if err != nil {
+			t.Fatal(err)
+		}
+		block, rest := pem.Decode(fixture)
+		if block == nil || len(strings.TrimSpace(string(rest))) != 0 {
+			t.Fatal("invalid cqrp-ca.pem fixture")
+		}
+		response := h.postJSON(t, mtcHTTPRequest{path: "/lintcert", profile: "cqrp_mtc_ca", contentType: "application/pkix-cert", body: block.Bytes})
+		assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+		for _, code := range mtc.MTCTlogRuleCodes() {
+			assertNoFindingCode(t, response.results, code)
+		}
+		assertNoFatalOrBug(t, response.results)
+	})
+
+	t.Run("generic CA does not require tlog", func(t *testing.T) {
+		response := h.postJSON(t, mtcHTTPRequest{path: "/lintcert", profile: "mtc_ca", contentType: "application/pkix-cert", body: mtctest.Certificate(mtctest.ValidCATemplate())})
+		assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+		assertNoFindingCode(t, response.results, "e_cqrp_ca_mtc_tlog_extension_missing")
+	})
+
+	t.Run("CQRP CA requires tlog exactly once", func(t *testing.T) {
+		template := mtctest.ValidCQRPCATemplate()
+		mtctest.RemoveExtension(&template, mtctest.OIDMTCTlogPrefixURL)
+		response := h.postJSON(t, mtcHTTPRequest{path: "/lintcert", profile: "cqrp_mtc_ca", contentType: "application/pkix-cert", body: mtctest.Certificate(template)})
+		assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+		assertFindingCount(t, response.results, "cqrplint", "e_cqrp_ca_mtc_tlog_extension_missing", 1)
+	})
+
+	t.Run("subscriber excludes CA and tlog rules", func(t *testing.T) {
+		response := h.postJSON(t, mtcHTTPRequest{path: "/lintcert", profile: "cqrp_mtc_subscriber", contentType: "application/pkix-cert", body: mtctest.Certificate(mtctest.ValidCQRPSubscriberTemplate())})
+		assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+		for _, result := range response.results {
+			if strings.HasPrefix(result.Code, "e_cqrp_ca_") {
+				t.Errorf("unexpected CA finding for subscriber: %#v", result)
+			}
+		}
+		for _, code := range mtc.MTCTlogRuleCodes() {
+			assertNoFindingCode(t, response.results, code)
+		}
+	})
+
+	malformedID := mtctest.ValidSubscriberTemplate()
+	proof := mtctest.ValidProof()
+	proof.Signatures = []mtctest.ProofSignature{{CosignerID: []byte{0x80, 0x01}, Signature: []byte{1}}}
+	malformedID.Signature = mtctest.ProofBytes(proof)
+
+	t.Run("complete subscriber checks cosigner trust anchor ID", func(t *testing.T) {
+		response := h.postJSON(t, mtcHTTPRequest{path: "/lintcert", profile: "mtc_subscriber", contentType: "application/pkix-cert", body: mtctest.Certificate(malformedID)})
+		assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+		assertFindingCount(t, response.results, "mtclint", "e_mtc_proof_cosigner_id_malformed", 1)
+	})
+
+	t.Run("subscriber TBS cannot inspect cosigner trust anchor ID", func(t *testing.T) {
+		response := h.postJSON(t, mtcHTTPRequest{path: "/linttbscert", profile: "mtc_subscriber", contentType: "application/octet-stream", body: mtctest.TBSCertificate(malformedID)})
+		assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+		assertNoFindingCode(t, response.results, "e_mtc_proof_cosigner_id_malformed")
+	})
+}
+
 func testMTCProfileMismatch(t *testing.T, h *mtcHTTPTestServer) {
 	for _, tc := range []struct {
 		name        string
@@ -715,6 +779,19 @@ func assertFinding(t *testing.T, results []request.LintResult, name, code, sever
 		}
 	}
 	t.Errorf("missing %s finding %q with severity %s in %#v", name, code, severity, results)
+}
+
+func assertFindingCount(t *testing.T, results []request.LintResult, name, code string, want int) {
+	t.Helper()
+	count := 0
+	for _, result := range results {
+		if result.Linter == name && result.Code == code {
+			count++
+		}
+	}
+	if count != want {
+		t.Errorf("%s finding %q count = %d, want %d in %#v", name, code, count, want, results)
+	}
 }
 
 func assertFindingExact(t *testing.T, results []request.LintResult, name, code, finding string) {

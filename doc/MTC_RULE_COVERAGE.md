@@ -167,6 +167,9 @@ codes.
 | Compatible RFC 5280 and TLS certificate rules | RFC 5280 and TLS Baseline Requirements | Sections not explicitly overridden | All MTC profiles | When a compatible linter can parse the artifact | n/a | linter-defined | delegated |
 | Outer Certificate and MTCProof checks on TBS input | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | All MTC TBS profiles | TBS lacks outer and proof fields | n/a | none | not applicable |
 | Inclusion root, proof hash, and cosignature cryptographic validation | draft-ietf-plants-merkle-tree-certs-05 | 4 and 6 | Subscriber / MTC and CQRP subscriber | Requires Merkle context and trusted keys | n/a | none | not locally decidable |
+| Trust Anchor ID PEN ownership | draft-ietf-tls-trust-anchor-ids-04 | 3 | Subscriber / MTC and CQRP subscriber | Requires an authoritative PEN registry and ownership context | n/a | none | not locally decidable |
+| mtc-tlog endpoints and checkpoint state | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Client behavior and log operation | CA / MTC and CQRP CA | Requires network access and external log state | n/a | none | not locally decidable |
 | External log-entry comparison and signer/operator role independence | draft-ietf-plants-merkle-tree-certs-05 and CQRP v0.2.0 local draft | Operational requirements | All MTC profiles | Requires external records and roles | n/a | none | not locally decidable |
+| Chrome cosigner independence | CQRP v0.2.0 local draft | Registry-dependent requirements | CQRP profiles | Requires Chrome registry and operator identity data | n/a | none | not locally decidable |
 | Chrome registry policy | CQRP v0.2.0 local draft | Registry-dependent requirements | CQRP profiles | Requires an online registry query | n/a | none | not locally decidable |
 | Conditional CA cRLSign behavior | CQRP v0.2.0 local draft | 4.5.1 | CA / CQRP CA | Requires external CA role and CRL behavior | n/a | none | not locally decidable |

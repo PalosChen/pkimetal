@@ -27,7 +27,10 @@ paths:
       description: >-
         Lints a complete X.509 Certificate or Precertificate. Experimental MTC
         draft-05 and CQRP v0.2.0 linting is selected with an explicit MTC
-        profile; autodetection never selects CQRP.
+        profile; autodetection never selects CQRP. CA and Subscriber profiles apply different rule sets:
+        CA profiles inspect CA parameters and
+        certificate-local mtc-tlog settings, while Subscriber profiles inspect
+        subscriber structure and MTCProof fields. cqrp_mtc_ca requires the certificate-local mtc-tlog extension.
       tags:
         - cert
       parameters:
@@ -168,8 +171,12 @@ components:
       description: >-
         Profile name. MTC values are mtc_ca, mtc_subscriber, cqrp_mtc_ca, and
         cqrp_mtc_subscriber. Omit or use autodetect for structural detection;
-        CQRP profiles must be explicit. Other legacy profile names remain
-        supported and are intentionally not constrained by an enum.
+        CQRP profiles must be explicit. CA and Subscriber profiles apply
+        different rule sets. Generic mtc_ca validates certificate-local
+        mtc-tlog parameters only when the extension is present; cqrp_mtc_ca
+        requires the certificate-local mtc-tlog extension. Other legacy
+        profile names remain supported and are intentionally not constrained
+        by an enum.
       schema:
         type: string
         default: autodetect
@@ -419,8 +426,10 @@ components:
           type: string
           description: >-
             Profile name. The four MTC values are mtc_ca, mtc_subscriber,
-            cqrp_mtc_ca, and cqrp_mtc_subscriber. Legacy names remain supported,
-            so this property intentionally has no enum.
+            cqrp_mtc_ca, and cqrp_mtc_subscriber. CA and Subscriber profiles
+            apply different rule sets; cqrp_mtc_ca requires the
+            certificate-local mtc-tlog extension. Legacy names remain
+            supported, so this property intentionally has no enum.
           default: autodetect
         severity:
           $ref: '#/components/schemas/FindingSeverity'
