@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	draft05Source = "draft-ietf-plants-merkle-tree-certs-05"
-	rfc9925Source = "RFC 9925"
-	maxUint48     = uint64(1<<48) - 1
+	draft05Source       = "draft-ietf-plants-merkle-tree-certs-05"
+	trustAnchor04Source = "draft-ietf-tls-trust-anchor-ids-04"
+	rfc9925Source       = "RFC 9925"
+	maxUint48           = uint64(1<<48) - 1
 )
 
 var (
@@ -230,6 +231,17 @@ var draft05Rules = []Rule{
 		}
 		return nil
 	}),
+	trustAnchor04Rule("e_mtc_proof_cosigner_id_malformed", "3", subscriberKinds, certificateInputKinds, func(a *Artifact) *Finding {
+		if !proofAvailable(a) {
+			return nil
+		}
+		for _, signature := range a.Proof.Signatures {
+			if len(signature.CosignerID) != 0 && !validTrustAnchorIDBinary(signature.CosignerID) {
+				return errorFinding("signatureValue.signatures.cosigner_id", "MTCProof cosigner ID is not a valid binary Trust Anchor ID")
+			}
+		}
+		return nil
+	}),
 	draftRule("e_mtc_proof_cosigner_order", "6.2", subscriberKinds, certificateInputKinds, func(a *Artifact) *Finding {
 		if !proofAvailable(a) || cosignersHaveDuplicate(a.Proof.Signatures) {
 			return nil
@@ -333,6 +345,10 @@ func LintDraft05ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
 
 func draftRule(code, section string, kinds []ArtifactKind, inputKinds []InputKind, evaluate func(*Artifact) *Finding) Rule {
 	return Rule{Code: code, Source: draft05Source, Section: section, Kinds: kinds, InputKinds: inputKinds, Evaluate: evaluate}
+}
+
+func trustAnchor04Rule(code, section string, kinds []ArtifactKind, inputKinds []InputKind, evaluate func(*Artifact) *Finding) Rule {
+	return Rule{Code: code, Source: trustAnchor04Source, Section: section, Kinds: kinds, InputKinds: inputKinds, Evaluate: evaluate}
 }
 
 func rfc9925Rule(code, section string, inputKinds []InputKind, evaluate func(*Artifact) *Finding) Rule {

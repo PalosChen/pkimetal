@@ -74,6 +74,7 @@ baseline remains the user-supplied local draft described above.
 | `e_mtc_cert_signature_algorithm_mismatch` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureAlgorithm | error | implemented |
 | `e_mtc_proof_cosigner_duplicate` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.signatures.cosigner_id | error | implemented |
 | `e_mtc_proof_cosigner_id_empty` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.signatures.cosigner_id | error | implemented |
+| `e_mtc_proof_cosigner_id_malformed` | draft-ietf-tls-trust-anchor-ids-04 | 3 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.signatures.cosigner_id | error | implemented |
 | `e_mtc_proof_cosigner_order` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.signatures.cosigner_id | error | implemented |
 | `e_mtc_proof_extensions_duplicate` | draft-ietf-plants-merkle-tree-certs-05 | 5.2.1 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.extensions | error | implemented |
 | `e_mtc_proof_extensions_order` | draft-ietf-plants-merkle-tree-certs-05 | 5.2.1 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureValue.extensions | error | implemented |

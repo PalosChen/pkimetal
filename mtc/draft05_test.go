@@ -52,6 +52,7 @@ var draft05Expectations = map[string]findingExpectation{
 	"e_mtc_proof_extensions_order":                        {"e_mtc_proof_extensions_order", Error, "signatureValue.extensions", "draft-ietf-plants-merkle-tree-certs-05", "5.2.1"},
 	"e_mtc_proof_extensions_duplicate":                    {"e_mtc_proof_extensions_duplicate", Error, "signatureValue.extensions", "draft-ietf-plants-merkle-tree-certs-05", "5.2.1"},
 	"e_mtc_proof_cosigner_id_empty":                       {"e_mtc_proof_cosigner_id_empty", Error, "signatureValue.signatures.cosigner_id", "draft-ietf-plants-merkle-tree-certs-05", "6.2"},
+	"e_mtc_proof_cosigner_id_malformed":                   {"e_mtc_proof_cosigner_id_malformed", Error, "signatureValue.signatures.cosigner_id", "draft-ietf-tls-trust-anchor-ids-04", "3"},
 	"e_mtc_proof_cosigner_order":                          {"e_mtc_proof_cosigner_order", Error, "signatureValue.signatures.cosigner_id", "draft-ietf-plants-merkle-tree-certs-05", "6.2"},
 	"e_mtc_proof_cosigner_duplicate":                      {"e_mtc_proof_cosigner_duplicate", Error, "signatureValue.signatures.cosigner_id", "draft-ietf-plants-merkle-tree-certs-05", "6.2"},
 	"e_rfc9925_unsigned_algorithm_mismatch":               {"e_rfc9925_unsigned_algorithm_mismatch", Error, "signatureAlgorithm", "RFC 9925", "3.1"},
@@ -880,6 +881,42 @@ func TestDraft05ProofUint48RangeIsCheckedWithoutCascades(t *testing.T) {
 	artifact := parseArtifact(t, mtctest.Certificate(mtctest.ValidSubscriberTemplate()), InputCertificate)
 	artifact.Proof.End = 1 << 48
 	assertFindings(t, LintDraft05(artifact), "e_mtc_proof_range_invalid")
+}
+
+func TestDraft05ProofCosignerIDEncoding(t *testing.T) {
+	tests := []struct {
+		name  string
+		kind  InputKind
+		id    []byte
+		proof bool
+		want  []string
+	}{
+		{"valid", InputCertificate, mtctest.ValidCAID(), true, nil},
+		{"unterminated", InputCertificate, []byte{0x81}, true, []string{"e_mtc_proof_cosigner_id_malformed"}},
+		{"non-minimal", InputCertificate, []byte{0x80, 0x01}, true, []string{"e_mtc_proof_cosigner_id_malformed"}},
+		{"empty owned by existing rule", InputCertificate, nil, true, []string{"e_mtc_proof_cosigner_id_empty"}},
+		{"TBS skips proof", InputTBSCertificate, []byte{0x81}, true, nil},
+		{"malformed proof suppresses ID rule", InputCertificate, []byte{0x81}, false, []string{"f_mtc_proof_malformed"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := mtctest.ValidSubscriberTemplate()
+			if tc.proof {
+				proof := mtctest.ValidProof()
+				proof.Signatures = []mtctest.ProofSignature{{CosignerID: tc.id, Signature: []byte{1}}}
+				tpl.Signature = mtctest.ProofBytes(proof)
+			} else {
+				tpl.Signature = mtctest.MalformedProofBytes()
+			}
+			var input []byte
+			if tc.kind == InputCertificate {
+				input = mtctest.Certificate(tpl)
+			} else {
+				input = mtctest.TBSCertificate(tpl)
+			}
+			assertFindings(t, LintDraft05(parseArtifact(t, input, tc.kind)), tc.want...)
+		})
+	}
 }
 
 func TestDraft05TBSDoesNotRunOuterOrProofRules(t *testing.T) {
