@@ -79,22 +79,22 @@ func TestCQRP020CARules(t *testing.T) {
 		{"wrong algorithm", func(x *mtctest.Template) {
 			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA65}
 			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1952)
-		}, []string{"e_cqrp_ca_spki_algorithm"}},
+		}, []string{"e_cqrp_ca_spki_algorithm", "e_mtc_tlog_ca_cosigner_not_mldsa44"}},
 		{"wrong public key length", func(x *mtctest.Template) {
 			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 32)
-		}, []string{"e_cqrp_ca_spki_key_encoding"}},
+		}, []string{"e_cqrp_ca_spki_key_encoding", "e_mtc_tlog_ca_cosigner_not_mldsa44"}},
 		{"public key not byte aligned", func(x *mtctest.Template) {
 			x.SubjectPublicKeyUnused = 1
-		}, []string{"e_cqrp_ca_spki_key_encoding"}},
+		}, []string{"e_cqrp_ca_spki_key_encoding", "e_mtc_tlog_ca_cosigner_not_mldsa44"}},
 		{"parameters and encoding", func(x *mtctest.Template) {
 			x.SPKIAlgorithm.ParametersPresent = true
 			x.SPKIAlgorithm.Parameters = []byte{0x05, 0x00}
-		}, []string{"e_cqrp_ca_spki_encoding", "e_cqrp_ca_spki_parameters_present"}},
+		}, []string{"e_cqrp_ca_spki_encoding", "e_cqrp_ca_spki_parameters_present", "e_mtc_tlog_ca_cosigner_not_mldsa44"}},
 		{"HashML-DSA 44", func(x *mtctest.Template) {
 			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDHashMLDSA44, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}
-		}, []string{"e_cqrp_ca_hash_mldsa"}},
-		{"HashML-DSA 65", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDHashMLDSA65} }, []string{"e_cqrp_ca_hash_mldsa"}},
-		{"HashML-DSA 87", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDHashMLDSA87} }, []string{"e_cqrp_ca_hash_mldsa"}},
+		}, []string{"e_cqrp_ca_hash_mldsa", "e_mtc_tlog_ca_cosigner_not_mldsa44"}},
+		{"HashML-DSA 65", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDHashMLDSA65} }, []string{"e_cqrp_ca_hash_mldsa", "e_mtc_tlog_ca_cosigner_not_mldsa44"}},
+		{"HashML-DSA 87", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDHashMLDSA87} }, []string{"e_cqrp_ca_hash_mldsa", "e_mtc_tlog_ca_cosigner_not_mldsa44"}},
 		{"key usage noncritical", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDKeyUsage, Value: mtctest.KeyUsageDER(true)})
 		}, []string{"e_cqrp_ca_key_usage_not_critical"}},
@@ -144,8 +144,8 @@ func TestCQRP020CAExtensionSignatureAlgorithm(t *testing.T) {
 		want []string
 	}{
 		{"ML-DSA-44", mtctest.Algorithm{OID: mtctest.OIDMLDSA44}, nil},
-		{"ML-DSA-65", mtctest.Algorithm{OID: mtctest.OIDMLDSA65}, []string{"e_cqrp_ca_signature_algorithm"}},
-		{"parameters", mtctest.Algorithm{OID: mtctest.OIDMLDSA44, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}, []string{"e_cqrp_ca_signature_algorithm_encoding", "e_cqrp_ca_signature_parameters_present"}},
+		{"ML-DSA-65", mtctest.Algorithm{OID: mtctest.OIDMLDSA65}, []string{"e_cqrp_ca_signature_algorithm", "e_mtc_tlog_ca_cosigner_not_mldsa44"}},
+		{"parameters", mtctest.Algorithm{OID: mtctest.OIDMLDSA44, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}, []string{"e_cqrp_ca_signature_algorithm_encoding", "e_cqrp_ca_signature_parameters_present", "e_mtc_tlog_ca_cosigner_not_mldsa44"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -548,6 +548,9 @@ func assertCQRPFindings(t *testing.T, findings []Finding, ids ...string) {
 	for i, id := range ids {
 		var ok bool
 		want[i], ok = cqrp020Expectations[id]
+		if !ok {
+			want[i], ok = mtcTlogExpectations[id]
+		}
 		if !ok {
 			t.Fatalf("unknown CQRP expectation %q", id)
 		}

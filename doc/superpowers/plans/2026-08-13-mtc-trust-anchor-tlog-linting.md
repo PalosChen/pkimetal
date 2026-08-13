@@ -224,6 +224,10 @@ cases := []struct {
 }
 ```
 
+Also verify that an opted-in CA reports
+`e_mtc_tlog_ca_cosigner_not_mldsa44` unless both its SPKI and CA extension
+`sigAlg` identify ML-DSA-44, as required by the C2SP Cosigners section.
+
 Also assert Subscriber artifacts and explicit Subscriber kind contexts produce no `mtc-tlog` findings.
 
 - [ ] **Step 2: Run focused tests and verify RED**

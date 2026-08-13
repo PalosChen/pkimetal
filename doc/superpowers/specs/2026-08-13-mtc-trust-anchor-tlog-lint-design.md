@@ -120,6 +120,8 @@ Add the following findings:
 - `e_mtc_tlog_prefix_url_invalid` when the IA5String is not a usable absolute
   HTTP or HTTPS URL prefix.
 - `e_mtc_tlog_log_hash_not_sha256` when an opted-in CA does not use SHA-256.
+- `e_mtc_tlog_ca_cosigner_not_mldsa44` when the CA cosigner SPKI or CA
+  extension `sigAlg` does not use ML-DSA-44.
 
 A usable URL prefix has an `http` or `https` scheme and a non-empty host. It
 must not contain user information, a query, or a fragment. The lint does not

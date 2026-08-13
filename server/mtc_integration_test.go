@@ -470,6 +470,14 @@ func testMTCTlogAndTrustAnchorRules(t *testing.T, h *mtcHTTPTestServer) {
 		assertNoFindingCode(t, response.results, "e_cqrp_ca_mtc_tlog_extension_missing")
 	})
 
+	t.Run("opted-in generic CA requires ML-DSA-44 cosigner", func(t *testing.T) {
+		template := mtctest.ValidCATemplate()
+		template.Extensions = append(template.Extensions, mtctest.Extension{ID: mtctest.OIDMTCTlogPrefixURL, Value: mtctest.MTCTlogPrefixURLDER("https://ca.example/mtc")})
+		response := h.postJSON(t, mtcHTTPRequest{path: "/lintcert", profile: "mtc_ca", contentType: "application/pkix-cert", body: mtctest.Certificate(template)})
+		assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+		assertFindingCount(t, response.results, "mtclint", "e_mtc_tlog_ca_cosigner_not_mldsa44", 1)
+	})
+
 	t.Run("CQRP CA requires tlog exactly once", func(t *testing.T) {
 		template := mtctest.ValidCQRPCATemplate()
 		mtctest.RemoveExtension(&template, mtctest.OIDMTCTlogPrefixURL)

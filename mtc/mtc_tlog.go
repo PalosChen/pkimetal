@@ -14,6 +14,7 @@ const (
 
 var mtcTlogRuleCodes = []string{
 	"e_cqrp_ca_mtc_tlog_extension_missing",
+	"e_mtc_tlog_ca_cosigner_not_mldsa44",
 	"e_mtc_tlog_extension_critical",
 	"e_mtc_tlog_extension_duplicate",
 	"e_mtc_tlog_extension_malformed",
@@ -115,6 +116,26 @@ func commonMTCTlogRules() []Rule {
 			}
 			return nil
 		}),
+		{
+			Code:       "e_mtc_tlog_ca_cosigner_not_mldsa44",
+			Source:     mtcTlogSource,
+			Section:    "Cosigners",
+			Kinds:      caKinds,
+			InputKinds: bothInputKinds,
+			Evaluate: func(a *Artifact) *Finding {
+				if a.CAParameters == nil {
+					return nil
+				}
+				spkiAlgorithm := a.SubjectPublicKey.Algorithm
+				signatureAlgorithm := a.CAParameters.SignatureAlgorithm
+				if !spkiAlgorithm.Algorithm.Equal(OIDMLDSA44) || spkiAlgorithm.ParametersPresent ||
+					!validMLDSAPublicKey(a.SubjectPublicKey, 1312) ||
+					!signatureAlgorithm.Algorithm.Equal(OIDMLDSA44) || signatureAlgorithm.ParametersPresent {
+					return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm,tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "mtc-tlog CA cosigner does not use ML-DSA-44")
+				}
+				return nil
+			},
+		},
 	}
 }
 

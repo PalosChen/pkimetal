@@ -111,6 +111,7 @@ CQRP section 4.6.1.
 | Code | Source | Section | Artifact / profile | Input applicability | Field(s) | Severity | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `e_cqrp_ca_mtc_tlog_extension_missing` | CQRP v0.2.0 | 4.6.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
+| `e_mtc_tlog_ca_cosigner_not_mldsa44` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Cosigners | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm,tbsCertificate.extensions.mtcCertificationAuthority.sigAlg | error | implemented |
 | `e_mtc_tlog_extension_critical` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
 | `e_mtc_tlog_extension_duplicate` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
 | `e_mtc_tlog_extension_malformed` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |

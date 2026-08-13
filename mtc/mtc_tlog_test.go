@@ -11,6 +11,7 @@ import (
 
 var mtcTlogExpectations = map[string]findingExpectation{
 	"e_cqrp_ca_mtc_tlog_extension_missing": {"e_cqrp_ca_mtc_tlog_extension_missing", Error, "tbsCertificate.extensions.mtcTlogPrefixURL", "CQRP v0.2.0", "4.6.1"},
+	"e_mtc_tlog_ca_cosigner_not_mldsa44":   {"e_mtc_tlog_ca_cosigner_not_mldsa44", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm,tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105", "Cosigners"},
 	"e_mtc_tlog_extension_critical":        {"e_mtc_tlog_extension_critical", Error, "tbsCertificate.extensions.mtcTlogPrefixURL", "C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105", "Parameters"},
 	"e_mtc_tlog_extension_duplicate":       {"e_mtc_tlog_extension_duplicate", Error, "tbsCertificate.extensions.mtcTlogPrefixURL", "C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105", "Parameters"},
 	"e_mtc_tlog_extension_malformed":       {"e_mtc_tlog_extension_malformed", Error, "tbsCertificate.extensions.mtcTlogPrefixURL", "C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105", "Parameters"},
@@ -68,9 +69,11 @@ func TestMTCTlogRules(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			tpl := mtctest.ValidCATemplate()
+			tpl.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA44}
+			tpl.SubjectPublicKey = make([]byte, 1312)
 			mtctest.RemoveExtension(&tpl, mtctest.OIDMTCTlogPrefixURL)
 			tpl.Extensions = append(tpl.Extensions, tc.extensions...)
-			mtctest.ReplaceExtension(&tpl, mtctest.Extension{ID: mtctest.OIDMTC_CA, Critical: true, Value: mtctest.CAExtensionDER(tc.logHash, mtctest.Algorithm{OID: mtctest.OIDMLDSA65}, big.NewInt(100), big.NewInt(999))})
+			mtctest.ReplaceExtension(&tpl, mtctest.Extension{ID: mtctest.OIDMTC_CA, Critical: true, Value: mtctest.CAExtensionDER(tc.logHash, mtctest.Algorithm{OID: mtctest.OIDMLDSA44}, big.NewInt(100), big.NewInt(999))})
 			artifact := parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)
 			var findings []Finding
 			if tc.required {
@@ -79,6 +82,42 @@ func TestMTCTlogRules(t *testing.T) {
 				findings = LintMTCTlogConditionalForKind(artifact, ArtifactCA)
 			}
 			assertMTCTlogFindings(t, findings, tc.want...)
+		})
+	}
+}
+
+func TestMTCTlogCACosignerMustUseMLDSA44(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		spki mtctest.Algorithm
+		sig  mtctest.Algorithm
+		kind InputKind
+		key  []byte
+		want []string
+	}{
+		{"ML-DSA-44 certificate", mtctest.Algorithm{OID: mtctest.OIDMLDSA44}, mtctest.Algorithm{OID: mtctest.OIDMLDSA44}, InputCertificate, make([]byte, 1312), nil},
+		{"ML-DSA-65 certificate", mtctest.Algorithm{OID: mtctest.OIDMLDSA65}, mtctest.Algorithm{OID: mtctest.OIDMLDSA65}, InputCertificate, make([]byte, 1952), []string{"e_mtc_tlog_ca_cosigner_not_mldsa44"}},
+		{"ML-DSA-65 TBS", mtctest.Algorithm{OID: mtctest.OIDMLDSA65}, mtctest.Algorithm{OID: mtctest.OIDMLDSA65}, InputTBSCertificate, make([]byte, 1952), []string{"e_mtc_tlog_ca_cosigner_not_mldsa44"}},
+		{"wrong key algorithm", mtctest.Algorithm{OID: mtctest.OIDMLDSA65}, mtctest.Algorithm{OID: mtctest.OIDMLDSA44}, InputCertificate, make([]byte, 1952), []string{"e_mtc_tlog_ca_cosigner_not_mldsa44"}},
+		{"wrong signature algorithm", mtctest.Algorithm{OID: mtctest.OIDMLDSA44}, mtctest.Algorithm{OID: mtctest.OIDMLDSA65}, InputCertificate, make([]byte, 1312), []string{"e_mtc_tlog_ca_cosigner_not_mldsa44"}},
+		{"SPKI parameters", mtctest.Algorithm{OID: mtctest.OIDMLDSA44, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}, mtctest.Algorithm{OID: mtctest.OIDMLDSA44}, InputCertificate, make([]byte, 1312), []string{"e_mtc_tlog_ca_cosigner_not_mldsa44"}},
+		{"signature parameters", mtctest.Algorithm{OID: mtctest.OIDMLDSA44}, mtctest.Algorithm{OID: mtctest.OIDMLDSA44, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}, InputCertificate, make([]byte, 1312), []string{"e_mtc_tlog_ca_cosigner_not_mldsa44"}},
+		{"invalid public key size", mtctest.Algorithm{OID: mtctest.OIDMLDSA44}, mtctest.Algorithm{OID: mtctest.OIDMLDSA44}, InputCertificate, make([]byte, 1311), []string{"e_mtc_tlog_ca_cosigner_not_mldsa44"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := mtctest.ValidCATemplate()
+			tpl.SPKIAlgorithm = tc.spki
+			tpl.SubjectPublicKey = tc.key
+			mtctest.ReplaceExtension(&tpl, mtctest.Extension{ID: mtctest.OIDMTC_CA, Critical: true, Value: mtctest.CAExtensionDER(mtctest.Algorithm{OID: mtctest.OIDSHA256}, tc.sig, big.NewInt(100), big.NewInt(999))})
+			tpl.Extensions = append(tpl.Extensions, mtctest.Extension{ID: mtctest.OIDMTCTlogPrefixURL, Value: mtctest.MTCTlogPrefixURLDER("https://ca.example/mtc")})
+			var input []byte
+			if tc.kind == InputCertificate {
+				input = mtctest.Certificate(tpl)
+			} else {
+				input = mtctest.TBSCertificate(tpl)
+			}
+			artifact := parseArtifact(t, input, tc.kind)
+			assertMTCTlogFindings(t, LintMTCTlogConditionalForKind(artifact, ArtifactCA), tc.want...)
 		})
 	}
 }
