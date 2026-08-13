@@ -12,6 +12,7 @@ const (
 	draft05Source       = "draft-ietf-plants-merkle-tree-certs-05"
 	trustAnchor04Source = "draft-ietf-tls-trust-anchor-ids-04"
 	rfc9925Source       = "RFC 9925"
+	rfc9881Source       = "RFC 9881"
 	maxUint48           = uint64(1<<48) - 1
 )
 
@@ -98,6 +99,23 @@ var draft05Rules = []Rule{
 		}
 		if !validMTCSerialBound(params.MinSerial) || !validMTCSerialBound(params.MaxSerial) || params.MinSerial.Cmp(params.MaxSerial) > 0 {
 			return errorFinding("tbsCertificate.extensions.mtcCertificationAuthority", "MTC CA serial range is invalid")
+		}
+		return nil
+	}),
+	draftRule("e_mtc_ca_signature_algorithm_key_mismatch", "5.5", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+		if a.CAParameters == nil {
+			return nil
+		}
+		keyAlgorithm := a.SubjectPublicKey.Algorithm.Algorithm
+		signatureAlgorithm := a.CAParameters.SignatureAlgorithm.Algorithm
+		if (isPureMLDSA(keyAlgorithm) || isPureMLDSA(signatureAlgorithm)) && !keyAlgorithm.Equal(signatureAlgorithm) {
+			return errorFinding("tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "MTC CA cosigner signature algorithm is incompatible with the subject public key algorithm")
+		}
+		return nil
+	}),
+	rfc9881Rule("e_mtc_ca_signature_algorithm_parameters_present", "2", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+		if a.CAParameters != nil && isPureMLDSA(a.CAParameters.SignatureAlgorithm.Algorithm) && a.CAParameters.SignatureAlgorithm.ParametersPresent {
+			return errorFinding("tbsCertificate.extensions.mtcCertificationAuthority.sigAlg.parameters", "ML-DSA signature algorithm parameters are present")
 		}
 		return nil
 	}),
@@ -349,6 +367,10 @@ func draftRule(code, section string, kinds []ArtifactKind, inputKinds []InputKin
 
 func trustAnchor04Rule(code, section string, kinds []ArtifactKind, inputKinds []InputKind, evaluate func(*Artifact) *Finding) Rule {
 	return Rule{Code: code, Source: trustAnchor04Source, Section: section, Kinds: kinds, InputKinds: inputKinds, Evaluate: evaluate}
+}
+
+func rfc9881Rule(code, section string, kinds []ArtifactKind, inputKinds []InputKind, evaluate func(*Artifact) *Finding) Rule {
+	return Rule{Code: code, Source: rfc9881Source, Section: section, Kinds: kinds, InputKinds: inputKinds, Evaluate: evaluate}
 }
 
 func rfc9925Rule(code, section string, inputKinds []InputKind, evaluate func(*Artifact) *Finding) Rule {

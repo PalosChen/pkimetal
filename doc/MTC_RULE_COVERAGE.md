@@ -69,6 +69,8 @@ baseline remains the user-supplied local draft described above.
 | `e_mtc_ca_extension_not_critical` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions | error | implemented |
 | `e_mtc_ca_key_cert_sign_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.keyUsage | error | implemented |
 | `e_mtc_ca_key_usage_missing` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.keyUsage | error | implemented |
+| `e_mtc_ca_signature_algorithm_key_mismatch` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.sigAlg | error | implemented |
+| `e_mtc_ca_signature_algorithm_parameters_present` | RFC 9881 | 2 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.sigAlg.parameters | error | implemented |
 | `e_mtc_ca_serial_range_invalid` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority | error | implemented |
 | `e_mtc_ca_subject_not_ca_id` | draft-ietf-plants-merkle-tree-certs-05 | 5.5 | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.subject | error | implemented |
 | `e_mtc_cert_signature_algorithm_mismatch` | draft-ietf-plants-merkle-tree-certs-05 | 6.2 | Subscriber / MTC and CQRP subscriber | Certificate only | signatureAlgorithm | error | implemented |

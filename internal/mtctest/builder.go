@@ -121,6 +121,7 @@ func ValidCQRPSubscriberTemplate() Template {
 func ValidCQRPCATemplate() Template {
 	tpl := ValidCATemplate()
 	tpl.SPKIAlgorithm = Algorithm{OID: OIDMLDSA44}
+	tpl.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1312)
 	return tpl
 }
 
@@ -164,6 +165,8 @@ func ValidCATemplate() Template {
 	tpl.Serial = big.NewInt(42)
 	tpl.TBSSignature = Algorithm{OID: OIDMLDSA65}
 	tpl.OuterSignature = Algorithm{OID: OIDMLDSA65}
+	tpl.SPKIAlgorithm = Algorithm{OID: OIDMLDSA65}
+	tpl.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1952)
 	tpl.Issuer = der(0x30, nil)
 	tpl.Subject = ValidCAIDNameDER()
 	tpl.Extensions = []Extension{

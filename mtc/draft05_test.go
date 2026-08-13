@@ -36,6 +36,8 @@ var draft05Expectations = map[string]findingExpectation{
 	"f_mtc_ca_extension_malformed":                        {"f_mtc_ca_extension_malformed", Fatal, "tbsCertificate.extensions", "draft-ietf-plants-merkle-tree-certs-05", "5.5"},
 	"e_mtc_ca_serial_range_invalid":                       {"e_mtc_ca_serial_range_invalid", Error, "tbsCertificate.extensions.mtcCertificationAuthority", "draft-ietf-plants-merkle-tree-certs-05", "5.5"},
 	"e_mtc_ca_key_usage_missing":                          {"e_mtc_ca_key_usage_missing", Error, "tbsCertificate.extensions.keyUsage", "draft-ietf-plants-merkle-tree-certs-05", "5.5"},
+	"e_mtc_ca_signature_algorithm_key_mismatch":           {"e_mtc_ca_signature_algorithm_key_mismatch", Error, "tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "draft-ietf-plants-merkle-tree-certs-05", "5.5"},
+	"e_mtc_ca_signature_algorithm_parameters_present":     {"e_mtc_ca_signature_algorithm_parameters_present", Error, "tbsCertificate.extensions.mtcCertificationAuthority.sigAlg.parameters", "RFC 9881", "2"},
 	"e_mtc_ca_key_cert_sign_missing":                      {"e_mtc_ca_key_cert_sign_missing", Error, "tbsCertificate.extensions.keyUsage", "draft-ietf-plants-merkle-tree-certs-05", "5.5"},
 	"e_mtc_ca_basic_constraints_missing":                  {"e_mtc_ca_basic_constraints_missing", Error, "tbsCertificate.extensions.basicConstraints", "draft-ietf-plants-merkle-tree-certs-05", "5.5"},
 	"e_mtc_ca_basic_constraints_not_ca":                   {"e_mtc_ca_basic_constraints_not_ca", Error, "tbsCertificate.extensions.basicConstraints", "draft-ietf-plants-merkle-tree-certs-05", "5.5"},
@@ -609,6 +611,59 @@ func TestDraft05CARules(t *testing.T) {
 			assertFindings(t, LintDraft05(artifact), tc.want)
 		})
 	}
+}
+
+func TestDraft05CAAlgorithmConsistency(t *testing.T) {
+	alg44 := mtctest.Algorithm{OID: mtctest.OIDMLDSA44}
+	alg65 := mtctest.Algorithm{OID: mtctest.OIDMLDSA65}
+	alg87 := mtctest.Algorithm{OID: mtctest.OIDMLDSA87}
+	unknownKey := mtctest.Algorithm{OID: mtctest.OIDRSAEncryption}
+	unknownSignature := mtctest.Algorithm{OID: mtctest.OIDSHA256}
+	tests := []struct {
+		name string
+		spki mtctest.Algorithm
+		sig  mtctest.Algorithm
+		want []string
+	}{
+		{"ML-DSA-44 match", alg44, alg44, nil},
+		{"ML-DSA-65 match", alg65, alg65, nil},
+		{"ML-DSA-87 match", alg87, alg87, nil},
+		{"ML-DSA-44 key with ML-DSA-65 signature", alg44, alg65, []string{"e_mtc_ca_signature_algorithm_key_mismatch"}},
+		{"ML-DSA-65 key with unknown signature", alg65, unknownSignature, []string{"e_mtc_ca_signature_algorithm_key_mismatch"}},
+		{"unknown key with ML-DSA-65 signature", unknownKey, alg65, []string{"e_mtc_ca_signature_algorithm_key_mismatch"}},
+		{"ML-DSA signature parameters", alg65, mtctest.Algorithm{OID: mtctest.OIDMLDSA65, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}, []string{"e_mtc_ca_signature_algorithm_parameters_present"}},
+		{"unknown pair not guessed", unknownKey, unknownSignature, nil},
+	}
+	for _, kind := range []InputKind{InputCertificate, InputTBSCertificate} {
+		for _, tc := range tests {
+			t.Run(tc.name+"/"+inputKindName(kind), func(t *testing.T) {
+				tpl := mtctest.ValidCATemplate()
+				tpl.SPKIAlgorithm = tc.spki
+				mtctest.ReplaceExtension(&tpl, mtctest.Extension{
+					ID:       mtctest.OIDMTC_CA,
+					Critical: true,
+					Value: mtctest.CAExtensionDER(
+						mtctest.Algorithm{OID: mtctest.OIDSHA256}, tc.sig,
+						big.NewInt(100), big.NewInt(999),
+					),
+				})
+				var input []byte
+				if kind == InputCertificate {
+					input = mtctest.Certificate(tpl)
+				} else {
+					input = mtctest.TBSCertificate(tpl)
+				}
+				assertFindings(t, LintDraft05(parseArtifact(t, input, kind)), tc.want...)
+			})
+		}
+	}
+}
+
+func inputKindName(kind InputKind) string {
+	if kind == InputCertificate {
+		return "certificate"
+	}
+	return "TBS"
 }
 
 func TestLintDraft05ForKindEvaluatesExplicitCAWithoutMutation(t *testing.T) {
