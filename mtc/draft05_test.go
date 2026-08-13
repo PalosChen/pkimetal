@@ -327,6 +327,7 @@ func assertRequirementCoverageRows(t *testing.T, body string) {
 	}
 	for _, requirement := range []string{
 		"Trust Anchor ID PEN ownership",
+		"Non-CA cosigner ML-DSA-44 key",
 		"mtc-tlog endpoints and checkpoint state",
 		"Chrome cosigner independence",
 	} {
