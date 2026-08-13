@@ -27,6 +27,24 @@ var (
 )
 
 var cqrp020Rules = []Rule{
+	cqrp020Rule("e_cqrp_ca_signature_algorithm", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+		if a.CAParameters != nil && !a.CAParameters.SignatureAlgorithm.Algorithm.Equal(OIDMLDSA44) {
+			return errorFinding("tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "CA cosigner signature algorithm is not ML-DSA-44")
+		}
+		return nil
+	}),
+	cqrp020Rule("e_cqrp_ca_signature_parameters_present", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+		if a.CAParameters != nil && a.CAParameters.SignatureAlgorithm.Algorithm.Equal(OIDMLDSA44) && a.CAParameters.SignatureAlgorithm.ParametersPresent {
+			return errorFinding("tbsCertificate.extensions.mtcCertificationAuthority.sigAlg.parameters", "ML-DSA-44 CA cosigner signature algorithm parameters are present")
+		}
+		return nil
+	}),
+	cqrp020Rule("e_cqrp_ca_signature_algorithm_encoding", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+		if a.CAParameters != nil && a.CAParameters.SignatureAlgorithm.Algorithm.Equal(OIDMLDSA44) && !bytes.Equal(a.CAParameters.SignatureAlgorithm.Raw, mlDSA44AlgorithmDER) {
+			return errorFinding("tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "ML-DSA-44 CA cosigner signature AlgorithmIdentifier does not have the required encoding")
+		}
+		return nil
+	}),
 	cqrp020Rule("e_cqrp_ca_spki_algorithm", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		algorithm := a.SubjectPublicKey.Algorithm.Algorithm
 		if !algorithm.Equal(OIDMLDSA44) && !isHashMLDSA(algorithm) {
@@ -212,9 +230,10 @@ var cqrp020Rules = []Rule{
 	}),
 }
 
-// LintCQRP020 evaluates only the CQRP v0.2.0 rules.
+// LintCQRP020 evaluates the CQRP v0.2.0 profile, including the CA-only
+// certificate-local mtc-tlog requirements.
 func LintCQRP020(artifact *Artifact) []Finding {
-	return runRules(artifact, cqrp020Rules)
+	return lintCQRP020(artifact)
 }
 
 // CQRP020RuleCodes returns the stable finding codes registered for CQRP
@@ -241,7 +260,17 @@ func LintCQRP020ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
 	if expected == ArtifactSubscriber && local.InputKind == InputCertificate {
 		local.Proof, local.ProofParseError = ParseProof(local.SignatureValue)
 	}
-	return runRules(&local, cqrp020Rules)
+	return lintCQRP020(&local)
+}
+
+func lintCQRP020(artifact *Artifact) []Finding {
+	findings := runRules(artifact, cqrp020Rules)
+	if artifact == nil || artifact.Kind != ArtifactCA {
+		return findings
+	}
+	findings = append(findings, LintMTCTlogRequiredForKind(artifact, ArtifactCA)...)
+	sortFindings(findings)
+	return findings
 }
 
 func cqrp020Rule(code, section string, kinds []ArtifactKind, inputKinds []InputKind, evaluate func(*Artifact) *Finding) Rule {

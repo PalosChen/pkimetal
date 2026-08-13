@@ -3,6 +3,7 @@ package mtc
 import (
 	"bytes"
 	"encoding/asn1"
+	"math/big"
 	"reflect"
 	"sort"
 	"testing"
@@ -18,6 +19,9 @@ var cqrp020Expectations = map[string]findingExpectation{
 	"e_cqrp_ca_spki_key_encoding":                {"e_cqrp_ca_spki_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.subjectPublicKey", "CQRP v0.2.0", "4.5.1"},
 	"e_cqrp_ca_hash_mldsa":                       {"e_cqrp_ca_hash_mldsa", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.1"},
 	"e_cqrp_ca_key_usage_not_critical":           {"e_cqrp_ca_key_usage_not_critical", Error, "tbsCertificate.extensions.keyUsage", "CQRP v0.2.0", "4.5.1"},
+	"e_cqrp_ca_signature_algorithm":              {"e_cqrp_ca_signature_algorithm", Error, "tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "CQRP v0.2.0", "4.5.1"},
+	"e_cqrp_ca_signature_algorithm_encoding":     {"e_cqrp_ca_signature_algorithm_encoding", Error, "tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "CQRP v0.2.0", "4.5.1"},
+	"e_cqrp_ca_signature_parameters_present":     {"e_cqrp_ca_signature_parameters_present", Error, "tbsCertificate.extensions.mtcCertificationAuthority.sigAlg.parameters", "CQRP v0.2.0", "4.5.1"},
 	"e_cqrp_subscriber_validity_too_long":        {"e_cqrp_subscriber_validity_too_long", Error, "tbsCertificate.validity", "CQRP v0.2.0", "2.1"},
 	"e_cqrp_subscriber_mldsa_parameters_present": {"e_cqrp_subscriber_mldsa_parameters_present", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm.parameters", "CQRP v0.2.0", "4.5.2"},
 	"e_cqrp_subscriber_mldsa_encoding":           {"e_cqrp_subscriber_mldsa_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.2"},
@@ -128,6 +132,27 @@ func TestCQRP020CARules(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tpl := mtctest.ValidCQRPCATemplate()
 			tc.mutate(&tpl)
+			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
+		})
+	}
+}
+
+func TestCQRP020CAExtensionSignatureAlgorithm(t *testing.T) {
+	tests := []struct {
+		name string
+		sig  mtctest.Algorithm
+		want []string
+	}{
+		{"ML-DSA-44", mtctest.Algorithm{OID: mtctest.OIDMLDSA44}, nil},
+		{"ML-DSA-65", mtctest.Algorithm{OID: mtctest.OIDMLDSA65}, []string{"e_cqrp_ca_signature_algorithm"}},
+		{"parameters", mtctest.Algorithm{OID: mtctest.OIDMLDSA44, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}, []string{"e_cqrp_ca_signature_algorithm_encoding", "e_cqrp_ca_signature_parameters_present"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := mtctest.ValidCQRPCATemplate()
+			mtctest.ReplaceExtension(&tpl, mtctest.Extension{ID: mtctest.OIDMTC_CA, Critical: true, Value: mtctest.CAExtensionDER(
+				mtctest.Algorithm{OID: mtctest.OIDSHA256}, tc.sig, big.NewInt(100), big.NewInt(999),
+			)})
 			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
 		})
 	}
@@ -464,6 +489,18 @@ func TestCQRP020ApplicabilityAndIndependence(t *testing.T) {
 	tpl.TBSSignature = mtctest.Algorithm{OID: asn1.ObjectIdentifier{1, 2, 3}}
 	tpl.OuterSignature = tpl.TBSSignature
 	assertCQRPFindings(t, LintCQRP020ForKind(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate), ArtifactSubscriber))
+}
+
+func TestCQRP020CARequiresMTCTlog(t *testing.T) {
+	tpl := mtctest.ValidCQRPCATemplate()
+	mtctest.RemoveExtension(&tpl, mtctest.OIDMTCTlogPrefixURL)
+	artifact := parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)
+	for _, finding := range LintCQRP020(artifact) {
+		if finding.Code == "e_cqrp_ca_mtc_tlog_extension_missing" {
+			return
+		}
+	}
+	t.Fatal("LintCQRP020 did not require the mtc-tlog extension for a CA")
 }
 
 func TestCQRP020RegistersExactlyRequiredRules(t *testing.T) {

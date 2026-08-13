@@ -123,6 +123,20 @@ func ValidCQRPCATemplate() Template {
 	tpl := ValidCATemplate()
 	tpl.SPKIAlgorithm = Algorithm{OID: OIDMLDSA44}
 	tpl.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1312)
+	ReplaceExtension(&tpl, Extension{
+		ID:       OIDMTC_CA,
+		Critical: true,
+		Value: CAExtensionDER(
+			Algorithm{OID: OIDSHA256},
+			Algorithm{OID: OIDMLDSA44},
+			big.NewInt(100),
+			big.NewInt(999),
+		),
+	})
+	tpl.Extensions = append(tpl.Extensions, Extension{
+		ID:    OIDMTCTlogPrefixURL,
+		Value: MTCTlogPrefixURLDER("https://ca.example/mtc"),
+	})
 	return tpl
 }
 
@@ -351,6 +365,7 @@ func WriteGeneratedFixtures(dir string) error {
 		contents []byte
 	}{
 		{"draft05-ca.pem", "CERTIFICATE", Certificate(ValidCATemplate())},
+		{"cqrp-ca.pem", "CERTIFICATE", Certificate(ValidCQRPCATemplate())},
 		{"draft05-subscriber-tbs.pem", "TBS CERTIFICATE", TBSCertificate(ValidSubscriberTemplate())},
 		{"cqrp-subscriber.pem", "CERTIFICATE", Certificate(ValidCQRPSubscriberTemplate())},
 	}

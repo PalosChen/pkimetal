@@ -90,6 +90,24 @@ func TestHandlerReturnsOnlyCQRPPolicyFindings(t *testing.T) {
 	assertLacksCode(t, results, "e_mtc_profile_artifact_mismatch")
 }
 
+func TestCQRPCARequiresMTCTlogExactlyOnceAndSubscriberDoesNot(t *testing.T) {
+	missing := mtctest.ValidCQRPCATemplate()
+	mtctest.RemoveExtension(&missing, mtctest.OIDMTCTlogPrefixURL)
+	results := handle(t, linter.CQRP_MTC_CA, parseArtifact(t, missing, mtc.InputCertificate))
+	assertCodeCount(t, results, "e_cqrp_ca_mtc_tlog_extension_missing", 1)
+
+	valid := mtctest.ValidCQRPCATemplate()
+	results = handle(t, linter.CQRP_MTC_CA, parseArtifact(t, valid, mtc.InputCertificate))
+	for _, code := range mtc.MTCTlogRuleCodes() {
+		assertLacksCode(t, results, code)
+	}
+
+	subscriber := handle(t, linter.CQRP_MTC_SUBSCRIBER, parseArtifact(t, mtctest.ValidCQRPSubscriberTemplate(), mtc.InputCertificate))
+	for _, code := range mtc.MTCTlogRuleCodes() {
+		assertLacksCode(t, subscriber, code)
+	}
+}
+
 func TestExpectedProfileKindControlsCQRPPolicyWithoutMutatingArtifact(t *testing.T) {
 	tpl := mtctest.ValidCQRPSubscriberTemplate()
 	tpl.SPKIAlgorithm.OID = mtctest.OIDMLDSA65
@@ -206,5 +224,18 @@ func assertLacksCode(t *testing.T, results []linter.LintingResult, code string) 
 			t.Errorf("unexpected finding %s in %#v", code, results)
 			return
 		}
+	}
+}
+
+func assertCodeCount(t *testing.T, results []linter.LintingResult, code string, want int) {
+	t.Helper()
+	got := 0
+	for _, result := range results {
+		if result.Code == code {
+			got++
+		}
+	}
+	if got != want {
+		t.Errorf("finding %s count = %d, want %d in %#v", code, got, want, results)
 	}
 }

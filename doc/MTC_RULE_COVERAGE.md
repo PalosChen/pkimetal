@@ -123,6 +123,9 @@ CQRP section 4.6.1.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `e_cqrp_ca_hash_mldsa` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm | error | implemented |
 | `e_cqrp_ca_key_usage_not_critical` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.keyUsage | error | implemented |
+| `e_cqrp_ca_signature_algorithm` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.sigAlg | error | implemented |
+| `e_cqrp_ca_signature_algorithm_encoding` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.sigAlg | error | implemented |
+| `e_cqrp_ca_signature_parameters_present` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.sigAlg.parameters | error | implemented |
 | `e_cqrp_ca_spki_algorithm` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm | error | implemented |
 | `e_cqrp_ca_spki_encoding` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm; tbsCertificate.subjectPublicKeyInfo.subjectPublicKey | error | implemented |
 | `e_cqrp_ca_spki_parameters_present` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm.parameters | error | implemented |

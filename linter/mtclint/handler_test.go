@@ -90,6 +90,18 @@ func TestCQRPProfilesAlsoRunDraftRulesButNotCQRPPolicy(t *testing.T) {
 	assertLacksCode(t, results, "e_cqrp_subscriber_validity_too_long")
 }
 
+func TestGenericCAConditionallyRunsMTCTlogRules(t *testing.T) {
+	tpl := mtctest.ValidCATemplate()
+	assertLacksCode(t, handle(t, linter.MTC_CA, parseArtifact(t, tpl, mtc.InputCertificate)), "e_cqrp_ca_mtc_tlog_extension_missing")
+
+	tpl.Extensions = append(tpl.Extensions, mtctest.Extension{ID: mtctest.OIDMTCTlogPrefixURL, Value: []byte{0x0c, 0x01, 'x'}})
+	results := handle(t, linter.MTC_CA, parseArtifact(t, tpl, mtc.InputCertificate))
+	assertCodeCount(t, results, "e_mtc_tlog_extension_malformed", 1)
+
+	results = handle(t, linter.CQRP_MTC_CA, parseArtifact(t, tpl, mtc.InputCertificate))
+	assertLacksCode(t, results, "e_mtc_tlog_extension_malformed")
+}
+
 func TestExpectedProfileKindControlsRulesAndReportsMismatch(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -277,5 +289,18 @@ func assertLacksCode(t *testing.T, results []linter.LintingResult, code string) 
 			t.Errorf("unexpected finding %s in %#v", code, results)
 			return
 		}
+	}
+}
+
+func assertCodeCount(t *testing.T, results []linter.LintingResult, code string, want int) {
+	t.Helper()
+	got := 0
+	for _, result := range results {
+		if result.Code == code {
+			got++
+		}
+	}
+	if got != want {
+		t.Errorf("finding %s count = %d, want %d in %#v", code, got, want, results)
 	}
 }

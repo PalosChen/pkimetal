@@ -491,7 +491,7 @@ func TestGeneratedFixturesAreReproducible(t *testing.T) {
 	if err := mtctest.WriteGeneratedFixtures(dir); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"draft05-ca.pem", "draft05-subscriber-tbs.pem", "cqrp-subscriber.pem"} {
+	for _, name := range []string{"draft05-ca.pem", "cqrp-ca.pem", "draft05-subscriber-tbs.pem", "cqrp-subscriber.pem"} {
 		want, err := os.ReadFile(filepath.Join("testdata", name))
 		if err != nil {
 			t.Fatal(err)

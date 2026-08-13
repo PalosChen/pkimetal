@@ -58,6 +58,11 @@ func runRules(artifact *Artifact, rules []Rule) []Finding {
 		findings = append(findings, *finding)
 	}
 
+	sortFindings(findings)
+	return findings
+}
+
+func sortFindings(findings []Finding) {
 	sort.Slice(findings, func(i, j int) bool {
 		left, right := findings[i], findings[j]
 		if left.Code != right.Code {
@@ -77,7 +82,6 @@ func runRules(artifact *Artifact, rules []Rule) []Finding {
 		}
 		return left.Severity < right.Severity
 	})
-	return findings
 }
 
 func evaluateRule(artifact *Artifact, rule Rule) (finding *Finding) {
