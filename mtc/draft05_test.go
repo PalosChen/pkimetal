@@ -68,6 +68,7 @@ var draft05Expectations = map[string]findingExpectation{
 func TestRuleCoverageDocument(t *testing.T) {
 	draftCodes := assertRuleCodeList(t, "draft-05", Draft05RuleCodes)
 	cqrpCodes := assertRuleCodeList(t, "CQRP v0.2.0", CQRP020RuleCodes)
+	mtcTlogCodes := assertRuleCodeList(t, "C2SP mtc-tlog", MTCTlogRuleCodes)
 
 	document, err := os.ReadFile("../doc/MTC_RULE_COVERAGE.md")
 	if err != nil {
@@ -75,6 +76,7 @@ func TestRuleCoverageDocument(t *testing.T) {
 	}
 	body := string(document)
 	codes := append(draftCodes, cqrpCodes...)
+	codes = append(codes, mtcTlogCodes...)
 	codes = append(codes, "e_mtc_profile_artifact_mismatch", "b_mtc_rule_panic")
 	for _, code := range codes {
 		if count := strings.Count(body, "`"+code+"`"); count != 1 {
@@ -113,8 +115,8 @@ type coverageRecord struct {
 
 func expectedCoverageRecords(t *testing.T) map[string]coverageRecord {
 	t.Helper()
-	fields := expectationFields(t, draft05Expectations, cqrp020Expectations)
-	records := make(map[string]coverageRecord, len(draft05Rules)+len(cqrp020Rules)+2)
+	fields := expectationFields(t, draft05Expectations, cqrp020Expectations, mtcTlogExpectations)
+	records := make(map[string]coverageRecord, len(draft05Rules)+len(cqrp020Rules)+len(mtcTlogRuleCodes)+2)
 	addRules := func(rules []Rule, cqrp bool) {
 		for _, rule := range rules {
 			if fields[rule.Code] == "" {
@@ -153,6 +155,16 @@ func expectedCoverageRecords(t *testing.T) map[string]coverageRecord {
 	}
 	addRules(draft05Rules, false)
 	addRules(cqrp020Rules, true)
+	addRules(commonMTCTlogRules(), false)
+	records["e_cqrp_ca_mtc_tlog_extension_missing"] = coverageRecord{
+		Source:             cqrp020Source,
+		Section:            "4.6.1",
+		ArtifactProfile:    "CA / CQRP CA",
+		InputApplicability: "Certificate and TBS",
+		Fields:             fields["e_cqrp_ca_mtc_tlog_extension_missing"],
+		Severity:           "error",
+		Status:             "implemented",
+	}
 	records["e_mtc_profile_artifact_mismatch"] = coverageRecord{
 		Source:             "pkimetal profile dispatch",
 		Section:            "Explicit MTC profile selection",

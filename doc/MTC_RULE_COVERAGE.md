@@ -101,6 +101,22 @@ baseline remains the user-supplied local draft described above.
 | `w_rfc9925_unsigned_authority_key_identifier_present` | RFC 9925 | 3.3 | Unsigned CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.authorityKeyIdentifier | warning | implemented |
 | `w_rfc9925_unsigned_issuer_alternative_name_present` | RFC 9925 | 3.3 | Unsigned CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | warning | implemented |
 
+### C2SP mtc-tlog certificate overlay
+
+The C2SP rules are pinned to repository commit
+`3bc97b2329fee167f7ff39efbbbc316c84876105`. Generic MTC CAs opt in by
+including the prefix URL extension; CQRP CAs require the extension through
+CQRP section 4.6.1.
+
+| Code | Source | Section | Artifact / profile | Input applicability | Field(s) | Severity | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `e_cqrp_ca_mtc_tlog_extension_missing` | CQRP v0.2.0 | 4.6.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
+| `e_mtc_tlog_extension_critical` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
+| `e_mtc_tlog_extension_duplicate` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
+| `e_mtc_tlog_extension_malformed` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
+| `e_mtc_tlog_log_hash_not_sha256` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.logHash | error | implemented |
+| `e_mtc_tlog_prefix_url_invalid` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
+
 ### CQRP v0.2.0 overlay
 
 | Code | Source | Section | Artifact / profile | Input applicability | Field(s) | Severity | Status |
