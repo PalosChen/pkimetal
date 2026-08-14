@@ -11,6 +11,7 @@ import (
 	"github.com/pkimetal/pkimetal/internal/mtctest"
 	"github.com/pkimetal/pkimetal/linter"
 	"github.com/pkimetal/pkimetal/mtc"
+	"github.com/zmap/zcrypto/x509"
 )
 
 func TestRegistration(t *testing.T) {
@@ -88,6 +89,34 @@ func TestHandlerReturnsOnlyCQRPPolicyFindings(t *testing.T) {
 	assertHasCode(t, results, "e_cqrp_subscriber_validity_too_long")
 	assertLacksCode(t, results, "e_mtc_serial_log_number_zero")
 	assertLacksCode(t, results, "e_mtc_profile_artifact_mismatch")
+}
+
+func TestSubscriberProfileAlwaysRunsCABFSANRules(t *testing.T) {
+	tpl := mtctest.ValidCQRPSubscriberTemplate()
+	mtctest.RemoveExtension(&tpl, mtctest.OIDSubjectAltName)
+	artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+
+	withoutLegacyCertificate := (&CQRPLint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{ProfileId: linter.CQRP_MTC_SUBSCRIBER, MTCArtifact: artifact})
+	assertHasCode(t, withoutLegacyCertificate, "e_cabf_mtc_subscriber_san_missing")
+
+	withLegacyCertificate := (&CQRPLint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{ProfileId: linter.CQRP_MTC_SUBSCRIBER, MTCArtifact: artifact, Cert: &x509.Certificate{}})
+	assertHasCode(t, withLegacyCertificate, "e_cabf_mtc_subscriber_san_missing")
+}
+
+func TestSubscriberProfileRunsNativeCQRPAndCABFRulesWithoutZCryptoCertificate(t *testing.T) {
+	tpl := mtctest.ValidCQRPSubscriberTemplate()
+	tpl.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDEd25519}
+	tpl.SubjectPublicKey = make([]byte, 32)
+	mtctest.ReplaceExtension(&tpl, mtctest.Extension{
+		ID:       mtctest.OIDBasicConstraints,
+		Critical: false,
+		Value:    mtctest.BasicConstraintsDER(false),
+	})
+	artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+
+	results := (&CQRPLint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{ProfileId: linter.CQRP_MTC_SUBSCRIBER, MTCArtifact: artifact})
+	assertHasCode(t, results, "e_cqrp_subscriber_mldsa_encoding")
+	assertHasCode(t, results, "e_cabf_mtc_subscriber_basic_constraints_not_critical")
 }
 
 func TestCQRPCARequiresMTCTlogExactlyOnceAndSubscriberDoesNot(t *testing.T) {

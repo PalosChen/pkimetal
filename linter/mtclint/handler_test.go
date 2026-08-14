@@ -10,6 +10,7 @@ import (
 	"github.com/pkimetal/pkimetal/internal/mtctest"
 	"github.com/pkimetal/pkimetal/linter"
 	"github.com/pkimetal/pkimetal/mtc"
+	"github.com/zmap/zcrypto/x509"
 )
 
 func TestRegistration(t *testing.T) {
@@ -88,6 +89,31 @@ func TestCQRPProfilesAlsoRunDraftRulesButNotCQRPPolicy(t *testing.T) {
 	results := handle(t, linter.CQRP_MTC_SUBSCRIBER, parseArtifact(t, tpl, mtc.InputCertificate))
 	assertHasCode(t, results, "e_mtc_serial_log_number_zero")
 	assertLacksCode(t, results, "e_cqrp_subscriber_validity_too_long")
+}
+
+func TestSubscriberProfilesAlwaysRunRFC5280SANRules(t *testing.T) {
+	for _, profile := range []linter.ProfileId{linter.MTC_SUBSCRIBER, linter.CQRP_MTC_SUBSCRIBER} {
+		tpl := mtctest.ValidCQRPSubscriberTemplate()
+		mtctest.RemoveExtension(&tpl, mtctest.OIDSubjectAltName)
+		artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+
+		withoutLegacyCertificate := (&MTCLint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{ProfileId: profile, MTCArtifact: artifact})
+		assertHasCode(t, withoutLegacyCertificate, "e_rfc5280_mtc_subscriber_san_missing")
+
+		withLegacyCertificate := (&MTCLint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{ProfileId: profile, MTCArtifact: artifact, Cert: &x509.Certificate{}})
+		assertHasCode(t, withLegacyCertificate, "e_rfc5280_mtc_subscriber_san_missing")
+	}
+}
+
+func TestSubscriberProfilesRunNativeRFCRulesWithoutZCryptoCertificate(t *testing.T) {
+	for _, profile := range []linter.ProfileId{linter.MTC_SUBSCRIBER, linter.CQRP_MTC_SUBSCRIBER} {
+		tpl := mtctest.ValidCQRPSubscriberTemplate()
+		tpl.NotAfter = tpl.NotBefore
+		artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+
+		results := (&MTCLint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{ProfileId: profile, MTCArtifact: artifact})
+		assertHasCode(t, results, "e_rfc5280_mtc_subscriber_validity_order")
+	}
 }
 
 func TestGenericCAConditionallyRunsMTCTlogRules(t *testing.T) {

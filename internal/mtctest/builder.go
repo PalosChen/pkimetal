@@ -23,6 +23,9 @@ var (
 	OIDHashMLDSA65         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 33}
 	OIDHashMLDSA87         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 34}
 	OIDRSAEncryption       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
+	OIDECPublicKey         = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
+	OIDDSAPublicKey        = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 1}
+	OIDEd25519             = asn1.ObjectIdentifier{1, 3, 101, 112}
 	OIDSHA256              = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
 	OIDUnsigned            = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 36}
 	OIDCommonName          = asn1.ObjectIdentifier{2, 5, 4, 3}
@@ -31,12 +34,17 @@ var (
 	OIDBasicConstraints    = asn1.ObjectIdentifier{2, 5, 29, 19}
 	OIDAuthorityKeyID      = asn1.ObjectIdentifier{2, 5, 29, 35}
 	OIDIssuerAltName       = asn1.ObjectIdentifier{2, 5, 29, 18}
+	OIDSubjectAltName      = asn1.ObjectIdentifier{2, 5, 29, 17}
 	OIDCertificatePolicies = asn1.ObjectIdentifier{2, 5, 29, 32}
 	OIDExtendedKeyUsage    = asn1.ObjectIdentifier{2, 5, 29, 37}
 	OIDServerAuth          = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1}
 	OIDSCTList             = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 2}
 	OIDOrganizationName    = asn1.ObjectIdentifier{2, 5, 4, 10}
 	OIDCountryName         = asn1.ObjectIdentifier{2, 5, 4, 6}
+	OIDLocalityName        = asn1.ObjectIdentifier{2, 5, 4, 7}
+	OIDStateOrProvinceName = asn1.ObjectIdentifier{2, 5, 4, 8}
+	OIDSurname             = asn1.ObjectIdentifier{2, 5, 4, 4}
+	OIDGivenName           = asn1.ObjectIdentifier{2, 5, 4, 42}
 	OIDPolicyDV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 1}
 	OIDPolicyOV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 2}
 	OIDPolicyIV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 3}
@@ -105,6 +113,7 @@ func ValidSubscriberTemplate() Template {
 		SubjectPublicKey: bytes.Repeat([]byte{0x5a}, 1312),
 		Extensions: []Extension{
 			{ID: OIDBasicConstraints, Critical: true, Value: der(0x30, nil)},
+			{ID: OIDSubjectAltName, Critical: true, Value: GeneralNamesDER(DNSNameGeneralNameDER("subscriber.example.com"))},
 		},
 		Signature: ProofBytes(ValidProof()),
 	}
@@ -282,6 +291,18 @@ func NameDER(attributes ...NameAttribute) []byte {
 
 func DirectoryNameGeneralNameDER(name []byte) []byte {
 	return der(0xa4, clone(name))
+}
+
+func DNSNameGeneralNameDER(name string) []byte {
+	return der(0x82, []byte(name))
+}
+
+func IPAddressGeneralNameDER(address []byte) []byte {
+	return der(0x87, clone(address))
+}
+
+func URINameGeneralNameDER(uri string) []byte {
+	return der(0x86, []byte(uri))
 }
 
 func GeneralNamesDER(names ...[]byte) []byte {

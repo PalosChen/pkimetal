@@ -43,7 +43,11 @@ func (l *CQRPLint) HandleRequest(_ context.Context, _ *linter.LinterInstance, re
 	default:
 		return nil
 	}
-	return mtcadapter.ConvertFindings(mtc.LintCQRP020ForKind(req.MTCArtifact, expected))
+	results := mtcadapter.ConvertFindings(mtc.LintCQRP020ForKind(req.MTCArtifact, expected))
+	if req.ProfileId == linter.CQRP_MTC_SUBSCRIBER {
+		results = append(results, mtcadapter.ConvertFindings(mtc.LintCABFTLSSubscriberForKind(req.MTCArtifact, expected))...)
+	}
+	return results
 }
 
 func (l *CQRPLint) ProcessResult(result linter.LintingResult) linter.LintingResult {

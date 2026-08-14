@@ -104,6 +104,9 @@ var cqrp020Rules = []Rule{
 	}),
 	cqrp020Rule("e_cqrp_subscriber_mldsa_encoding", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		algorithm := a.SubjectPublicKey.Algorithm
+		if !isHashMLDSA(algorithm.Algorithm) && !algorithm.Algorithm.Equal(oidRSAEncryption) && !algorithm.Algorithm.Equal(oidECPublicKey) && !isPureMLDSA(algorithm.Algorithm) {
+			return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "subscriber subject public key algorithm is not permitted by the TLS BR or CQRP profile")
+		}
 		if expected, keySize := expectedMLDSAEncoding(algorithm.Algorithm); expected != nil {
 			if !bytes.Equal(algorithm.Raw, expected) {
 				return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "ML-DSA AlgorithmIdentifier does not have the required encoding")

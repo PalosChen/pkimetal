@@ -60,6 +60,7 @@ func TestMTCCertificateEndpoints(t *testing.T) {
 	t.Run("explicit profiles", func(t *testing.T) { testMTCExplicitProfiles(t, h) })
 	t.Run("draft autodetection", func(t *testing.T) { testMTCDraftAutodetection(t, h) })
 	t.Run("linter fanout", func(t *testing.T) { testMTCLinterFanout(t, h) })
+	t.Run("subscriber SAN fallback", func(t *testing.T) { testMTCSubscriberSANFallback(t, h) })
 	t.Run("error formats", func(t *testing.T) { testMTCErrorFormats(t, h) })
 	t.Run("error matrix", func(t *testing.T) { testMTCErrorMatrix(t, h) })
 	t.Run("invalid endpoint", func(t *testing.T) { testMTCInvalidEndpoint(t, h) })
@@ -290,6 +291,23 @@ func testMTCLinterFanout(t *testing.T, h *mtcHTTPTestServer) {
 	assertNoLinterVersionMeta(t, draft.results, "cqrplint")
 	assertFindingTextContains(t, draft.results, "cqrplint", "Not used [Available:true, Applicable:false]")
 	assertNoFatalOrBug(t, draft.results)
+}
+
+func testMTCSubscriberSANFallback(t *testing.T, h *mtcHTTPTestServer) {
+	template := mtctest.ValidCQRPSubscriberTemplate()
+	mtctest.ReplaceExtension(&template, mtctest.Extension{
+		ID:       mtctest.OIDSubjectAltName,
+		Critical: true,
+		Value:    mtctest.GeneralNamesDER(mtctest.DNSNameGeneralNameDER("invalid_name.example.com")),
+	})
+	response := h.postJSON(t, mtcHTTPRequest{
+		path:        "/lintcert",
+		profile:     "cqrp_mtc_subscriber",
+		contentType: "application/pkix-cert",
+		body:        mtctest.Certificate(template),
+	})
+	assertStatusAndContentType(t, response, fasthttp.StatusOK, "application/json; charset=UTF-8")
+	assertFindingCount(t, response.results, "cqrplint", "e_cabf_mtc_subscriber_dns_name_invalid", 1)
 }
 
 func testMTCErrorFormats(t *testing.T, h *mtcHTTPTestServer) {

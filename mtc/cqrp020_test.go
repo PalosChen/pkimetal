@@ -179,7 +179,12 @@ func TestCQRP020SubscriberSPKIAndValidity(t *testing.T) {
 		{"traditional RSA delegated", func(x *mtctest.Template) {
 			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDRSAEncryption, ParametersPresent: true, Parameters: []byte{0x05, 0x00}}
 		}, nil},
-		{"unknown traditional delegated", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: asn1.ObjectIdentifier{1, 2, 3, 4}} }, nil},
+		{"traditional ECDSA delegated", func(x *mtctest.Template) {
+			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDECPublicKey, ParametersPresent: true, Parameters: []byte{0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07}}
+		}, nil},
+		{"unknown algorithm rejected", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: asn1.ObjectIdentifier{1, 2, 3, 4}} }, []string{"e_cqrp_subscriber_mldsa_encoding"}},
+		{"DSA rejected", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDDSAPublicKey} }, []string{"e_cqrp_subscriber_mldsa_encoding"}},
+		{"Ed25519 rejected", func(x *mtctest.Template) { x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDEd25519} }, []string{"e_cqrp_subscriber_mldsa_encoding"}},
 		{"ML-DSA-44 exact", func(x *mtctest.Template) {
 			x.SPKIAlgorithm = mtctest.Algorithm{OID: mtctest.OIDMLDSA44}
 			x.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1312)

@@ -56,6 +56,9 @@ func (l *MTCLint) HandleRequest(_ context.Context, _ *linter.LinterInstance, req
 	}
 
 	results = append(results, mtcadapter.ConvertFindings(mtc.LintDraft05ForKind(req.MTCArtifact, expected))...)
+	if expected == mtc.ArtifactSubscriber {
+		results = append(results, mtcadapter.ConvertFindings(mtc.LintRFC5280SubscriberForKind(req.MTCArtifact, expected))...)
+	}
 	if req.ProfileId == linter.MTC_CA {
 		results = append(results, mtcadapter.ConvertFindings(mtc.LintMTCTlogConditionalForKind(req.MTCArtifact, expected))...)
 	}
