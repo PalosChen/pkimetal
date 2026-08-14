@@ -25,6 +25,7 @@ type config struct {
 		MonitoringPath       string        `mapstructure:"monitoringPath"`
 		EnableDebugEndpoints bool          `mapstructure:"enableDebugEndpoints"`
 		SocketPermissions    os.FileMode   `mapstructure:"socketPermissions"`
+		MaxRequestBodySize   int           `mapstructure:"maxRequestBodySize"`
 		ReadTimeout          time.Duration `mapstructure:"readTimeout"`
 		IdleTimeout          time.Duration `mapstructure:"idleTimeout"`
 		DisableKeepalive     bool          `mapstructure:"disableKeepalive"`
@@ -35,8 +36,9 @@ type config struct {
 		MetricsTimeout       time.Duration `mapstructure:"metricsTimeout"`
 	}
 	Linter struct {
-		MaxQueueSize int `mapstructure:"maxQueueSize"`
-		Badkeys      struct {
+		MaxQueueSize   int           `mapstructure:"maxQueueSize"`
+		BackendTimeout time.Duration `mapstructure:"backendTimeout"`
+		Badkeys        struct {
 			NumProcesses int    `mapstructure:"numProcesses"`
 			PythonDir    string `mapstructure:"pythonDir"`
 		}
@@ -187,6 +189,7 @@ func initViper() error {
 	viper.SetDefault("server.monitoringAddress", "")
 	viper.SetDefault("server.enableDebugEndpoints", false)
 	viper.SetDefault("server.socketPermissions", 0o600)
+	viper.SetDefault("server.maxRequestBodySize", 10*1024*1024) // 10 MiB.
 	viper.SetDefault("server.readTimeout", 30*time.Second)
 	viper.SetDefault("server.idleTimeout", 30*time.Second)
 	viper.SetDefault("server.disableKeepalive", false)
@@ -196,6 +199,7 @@ func initViper() error {
 	viper.SetDefault("server.rememberBusyTimeout", 5*time.Second)
 	viper.SetDefault("server.metricsTimeout", 8*time.Second)
 	viper.SetDefault("linter.maxQueueSize", 8192)
+	viper.SetDefault("linter.backendTimeout", 30*time.Second)
 	viper.SetDefault("linter.badkeys.numProcesses", 1)
 	viper.SetDefault("linter.badkeys.pythonDir", "autodetect")
 	viper.SetDefault("linter.certlint.numProcesses", 1)

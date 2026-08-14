@@ -1,5 +1,5 @@
 # BUILD.
-FROM docker.io/library/golang:1.26.5-alpine3.24 AS build
+FROM docker.io/library/golang:1.26.5-alpine3.24@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2 AS build
 
 # Install build dependencies.
 RUN apk add --no-cache busybox && \
@@ -25,20 +25,22 @@ WORKDIR /app
 COPY . .
 ARG gomodfile=go.mod
 RUN \
-	# Fetch repositories.
+	# Fetch repositories.  These modules are pinned in $gomodfile, so use
+	# "go mod download" (which honours those pinned versions) rather than
+	# "go get" (which would resolve/upgrade to the latest available version).
 	mkdir /usr/local/build && \
 	mkdir /usr/local/pkimetal && \
-	go get -modfile=$gomodfile github.com/badkeys/badkeys && \
+	go mod download -modfile=$gomodfile github.com/badkeys/badkeys && \
 	cp -R $(go list -modfile=$gomodfile -m -f '{{.Dir}}' github.com/badkeys/badkeys) /usr/local/build/badkeys/ && \
-	go get -modfile=$gomodfile github.com/certlint/certlint && \
+	go mod download -modfile=$gomodfile github.com/certlint/certlint && \
 	cp -R $(go list -modfile=$gomodfile -m -f '{{.Dir}}' github.com/certlint/certlint) /usr/local/pkimetal/certlint/ && \
-	go get -modfile=$gomodfile github.com/CVE-2008-0166/dwk_blocklists_sqlite3 && \
+	go mod download -modfile=$gomodfile github.com/CVE-2008-0166/dwk_blocklists_sqlite3 && \
 	cp -R $(go list -modfile=$gomodfile -m -f '{{.Dir}}' github.com/CVE-2008-0166/dwk_blocklists_sqlite3) /usr/local/pkimetal/dwk_blocklists_sqlite3/ && \
-	go get -modfile=$gomodfile github.com/rspeer/python-ftfy && \
+	go mod download -modfile=$gomodfile github.com/rspeer/python-ftfy && \
 	cp -R $(go list -modfile=$gomodfile -m -f '{{.Dir}}' github.com/rspeer/python-ftfy) /usr/local/build/ftfy/ && \
-	go get -modfile=$gomodfile github.com/digicert/pkilint && \
+	go mod download -modfile=$gomodfile github.com/digicert/pkilint && \
 	cp -R $(go list -modfile=$gomodfile -m -f '{{.Dir}}' github.com/digicert/pkilint) /usr/local/build/pkilint/ && \
-	go get -modfile=$gomodfile github.com/kroeckx/x509lint && \
+	go mod download -modfile=$gomodfile github.com/kroeckx/x509lint && \
 	cp -R $(go list -modfile=$gomodfile -m -f '{{.Dir}}' github.com/kroeckx/x509lint) /usr/local/build/x509lint/ && \
 	# Install poetry (for building Python-based linters).
 	pipx install poetry && \
@@ -94,7 +96,7 @@ RUN \
 
 
 # RUNTIME.
-FROM alpine:3.24 AS runtime
+FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS runtime
 
 # Configure environment.
 CMD ["/app/pkimetal"]

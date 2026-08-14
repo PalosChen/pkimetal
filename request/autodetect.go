@@ -207,16 +207,15 @@ func (ri *RequestInfo) GetProfile(profileName string) bool {
 				return true
 			}
 		}
-		if ri.cert == nil {
-			return false
-		}
-
 		switch ri.endpoint {
 		case ENDPOINT_LINTCRL, ENDPOINT_LINTTBSCRL:
 			ri.profileId = ri.detectCRLProfile()
 		case ENDPOINT_LINTOCSP, ENDPOINT_LINTTBSOCSP:
 			ri.profileId = linter.RFC6960_OCSPRESPONSE
 		case ENDPOINT_LINTCERT, ENDPOINT_LINTTBSCERT:
+			if ri.cert == nil {
+				return false
+			}
 			if isRootCertificate(ri.cert) {
 				ri.profileId = ri.detectRootCertificateProfile()
 			} else if ri.cert.BasicConstraintsValid && ri.cert.IsCA {

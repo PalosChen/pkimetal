@@ -9,3 +9,11 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
+  - package-ecosystem: "npm" # Keeps @redocly/cli (doc tooling) pinned in package-lock.json up to date.
+    directory: "/"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "docker" # Keeps the digest-pinned base images in the Dockerfile up to date.
+    directory: "/"
+    schedule:
+      interval: "daily"
