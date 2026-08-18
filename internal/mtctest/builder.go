@@ -12,42 +12,58 @@ import (
 )
 
 var (
-	OIDMTCProof            = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 0}
-	OIDCAID                = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 1}
-	OIDMTC_CA              = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 2}
-	OIDMTCTlogPrefixURL    = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 64829, 2, 1}
-	OIDMLDSA44             = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 17}
-	OIDMLDSA65             = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 18}
-	OIDMLDSA87             = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 19}
-	OIDHashMLDSA44         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 32}
-	OIDHashMLDSA65         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 33}
-	OIDHashMLDSA87         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 34}
-	OIDRSAEncryption       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
-	OIDECPublicKey         = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
-	OIDDSAPublicKey        = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 1}
-	OIDEd25519             = asn1.ObjectIdentifier{1, 3, 101, 112}
-	OIDSHA256              = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
-	OIDUnsigned            = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 36}
-	OIDCommonName          = asn1.ObjectIdentifier{2, 5, 4, 3}
-	OIDKeyUsage            = asn1.ObjectIdentifier{2, 5, 29, 15}
-	OIDSubjectKeyID        = asn1.ObjectIdentifier{2, 5, 29, 14}
-	OIDBasicConstraints    = asn1.ObjectIdentifier{2, 5, 29, 19}
-	OIDAuthorityKeyID      = asn1.ObjectIdentifier{2, 5, 29, 35}
-	OIDIssuerAltName       = asn1.ObjectIdentifier{2, 5, 29, 18}
-	OIDSubjectAltName      = asn1.ObjectIdentifier{2, 5, 29, 17}
-	OIDCertificatePolicies = asn1.ObjectIdentifier{2, 5, 29, 32}
-	OIDExtendedKeyUsage    = asn1.ObjectIdentifier{2, 5, 29, 37}
-	OIDServerAuth          = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1}
-	OIDSCTList             = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 2}
-	OIDOrganizationName    = asn1.ObjectIdentifier{2, 5, 4, 10}
-	OIDCountryName         = asn1.ObjectIdentifier{2, 5, 4, 6}
-	OIDLocalityName        = asn1.ObjectIdentifier{2, 5, 4, 7}
-	OIDStateOrProvinceName = asn1.ObjectIdentifier{2, 5, 4, 8}
-	OIDSurname             = asn1.ObjectIdentifier{2, 5, 4, 4}
-	OIDGivenName           = asn1.ObjectIdentifier{2, 5, 4, 42}
-	OIDPolicyDV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 1}
-	OIDPolicyOV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 2}
-	OIDPolicyIV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 3}
+	OIDMTCProof               = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 0}
+	OIDCAID                   = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 1}
+	OIDMTC_CA                 = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 2}
+	OIDMTCTlogPrefixURL       = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 64829, 2, 1}
+	OIDMLDSA44                = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 17}
+	OIDMLDSA65                = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 18}
+	OIDMLDSA87                = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 19}
+	OIDHashMLDSA44            = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 32}
+	OIDHashMLDSA65            = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 33}
+	OIDHashMLDSA87            = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 34}
+	OIDRSAEncryption          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
+	OIDECPublicKey            = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
+	OIDDSAPublicKey           = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 1}
+	OIDEd25519                = asn1.ObjectIdentifier{1, 3, 101, 112}
+	OIDSHA256                 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
+	OIDUnsigned               = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 36}
+	OIDCommonName             = asn1.ObjectIdentifier{2, 5, 4, 3}
+	OIDSerialNumber           = asn1.ObjectIdentifier{2, 5, 4, 5}
+	OIDStreetAddress          = asn1.ObjectIdentifier{2, 5, 4, 9}
+	OIDPostalCode             = asn1.ObjectIdentifier{2, 5, 4, 17}
+	OIDBusinessCategory       = asn1.ObjectIdentifier{2, 5, 4, 15}
+	OIDOrganizationIdentifier = asn1.ObjectIdentifier{2, 5, 4, 97}
+	OIDDomainComponent        = asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 25}
+	OIDJurisdictionLocality   = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 60, 2, 1, 1}
+	OIDJurisdictionState      = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 60, 2, 1, 2}
+	OIDJurisdictionCountry    = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 60, 2, 1, 3}
+	OIDKeyUsage               = asn1.ObjectIdentifier{2, 5, 29, 15}
+	OIDSubjectKeyID           = asn1.ObjectIdentifier{2, 5, 29, 14}
+	OIDBasicConstraints       = asn1.ObjectIdentifier{2, 5, 29, 19}
+	OIDNameConstraints        = asn1.ObjectIdentifier{2, 5, 29, 30}
+	OIDCRLDistributionPoints  = asn1.ObjectIdentifier{2, 5, 29, 31}
+	OIDAuthorityKeyID         = asn1.ObjectIdentifier{2, 5, 29, 35}
+	OIDAuthorityInfoAccess    = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 1}
+	OIDAccessMethodOCSP       = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 1}
+	OIDAccessMethodIssuers    = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 2}
+	OIDIssuerAltName          = asn1.ObjectIdentifier{2, 5, 29, 18}
+	OIDSubjectAltName         = asn1.ObjectIdentifier{2, 5, 29, 17}
+	OIDCertificatePolicies    = asn1.ObjectIdentifier{2, 5, 29, 32}
+	OIDExtendedKeyUsage       = asn1.ObjectIdentifier{2, 5, 29, 37}
+	OIDServerAuth             = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1}
+	OIDSCTList                = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 2}
+	OIDOrganizationName       = asn1.ObjectIdentifier{2, 5, 4, 10}
+	OIDOrganizationalUnitName = asn1.ObjectIdentifier{2, 5, 4, 11}
+	OIDCountryName            = asn1.ObjectIdentifier{2, 5, 4, 6}
+	OIDLocalityName           = asn1.ObjectIdentifier{2, 5, 4, 7}
+	OIDStateOrProvinceName    = asn1.ObjectIdentifier{2, 5, 4, 8}
+	OIDSurname                = asn1.ObjectIdentifier{2, 5, 4, 4}
+	OIDGivenName              = asn1.ObjectIdentifier{2, 5, 4, 42}
+	OIDPolicyDV               = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 1}
+	OIDPolicyOV               = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 2}
+	OIDPolicyIV               = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 3}
+	OIDPolicyQualifierCPS     = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 2, 1}
 )
 
 type Algorithm struct {
@@ -114,6 +130,7 @@ func ValidSubscriberTemplate() Template {
 		Extensions: []Extension{
 			{ID: OIDBasicConstraints, Critical: true, Value: der(0x30, nil)},
 			{ID: OIDSubjectAltName, Critical: true, Value: GeneralNamesDER(DNSNameGeneralNameDER("subscriber.example.com"))},
+			{ID: OIDAuthorityKeyID, Value: AuthorityKeyIdentifierDER([]byte{0x81, 0xfd, 0x59, 0x01})},
 		},
 		Signature: ProofBytes(ValidProof()),
 	}
@@ -122,8 +139,13 @@ func ValidSubscriberTemplate() Template {
 func ValidCQRPSubscriberTemplate() Template {
 	tpl := ValidSubscriberTemplate()
 	tpl.Extensions = append(tpl.Extensions,
+		Extension{ID: OIDKeyUsage, Critical: true, Value: KeyUsageBitsDER(0x8000)},
 		Extension{ID: OIDCertificatePolicies, Value: CertificatePoliciesDER(OIDPolicyDV)},
 		Extension{ID: OIDExtendedKeyUsage, Value: ExtendedKeyUsageDER(OIDServerAuth)},
+		Extension{ID: OIDAuthorityInfoAccess, Value: AuthorityInformationAccessDER(
+			AccessDescriptionDER(OIDAccessMethodOCSP, "http://ocsp.example.com"),
+			AccessDescriptionDER(OIDAccessMethodIssuers, "http://ca.example.com/issuer.der"),
+		)},
 	)
 	return tpl
 }
@@ -232,11 +254,28 @@ func RemoveExtension(tpl *Template, id asn1.ObjectIdentifier) {
 }
 
 func KeyUsageDER(keyCertSign bool) []byte {
-	bits := byte(0x80)
+	usage := uint16(0x8000)
 	if keyCertSign {
-		bits |= 0x04
+		usage |= 0x0400
 	}
-	return bitString([]byte{bits}, 2)
+	return KeyUsageBitsDER(usage)
+}
+
+func KeyUsageBitsDER(usage uint16) []byte {
+	if usage == 0 {
+		return bitString([]byte{0}, 7)
+	}
+	encoded := []byte{byte(usage >> 8)}
+	if usage&0xff != 0 {
+		encoded = append(encoded, byte(usage))
+	}
+	last := encoded[len(encoded)-1]
+	unused := 0
+	for last&1 == 0 {
+		unused++
+		last >>= 1
+	}
+	return bitString(encoded, unused)
 }
 
 func BasicConstraintsDER(ca bool) []byte {
@@ -250,6 +289,32 @@ func SubjectKeyIdentifierDER(id []byte) []byte {
 	return der(0x04, clone(id))
 }
 
+func AuthorityKeyIdentifierDER(id []byte) []byte {
+	return der(0x30, der(0x80, clone(id)))
+}
+
+func AccessDescriptionDER(method asn1.ObjectIdentifier, uri string) []byte {
+	return AccessDescriptionWithLocationDER(method, URINameGeneralNameDER(uri))
+}
+
+func AccessDescriptionWithLocationDER(method asn1.ObjectIdentifier, location []byte) []byte {
+	return der(0x30, mustMarshal(method), clone(location))
+}
+
+func AuthorityInformationAccessDER(descriptions ...[]byte) []byte {
+	return der(0x30, descriptions...)
+}
+
+func CRLDistributionPointsDER(uris ...string) []byte {
+	distributionPoints := make([][]byte, 0, len(uris))
+	for _, uri := range uris {
+		fullName := der(0xa0, URINameGeneralNameDER(uri))
+		distributionPointName := der(0xa0, fullName)
+		distributionPoints = append(distributionPoints, der(0x30, distributionPointName))
+	}
+	return der(0x30, distributionPoints...)
+}
+
 func MTCTlogPrefixURLDER(value string) []byte {
 	return der(0x16, []byte(value))
 }
@@ -260,6 +325,29 @@ func CertificatePoliciesDER(ids ...asn1.ObjectIdentifier) []byte {
 		policies = append(policies, der(0x30, mustMarshal(id)))
 	}
 	return der(0x30, policies...)
+}
+
+func CertificatePolicyWithQualifierDER(policyID, qualifierID asn1.ObjectIdentifier, qualifier []byte) []byte {
+	qualifierInfo := der(0x30, mustMarshal(qualifierID), clone(qualifier))
+	policyQualifiers := der(0x30, qualifierInfo)
+	policy := der(0x30, mustMarshal(policyID), policyQualifiers)
+	return der(0x30, policy)
+}
+
+func IA5StringDER(value string) []byte {
+	return der(0x16, []byte(value))
+}
+
+func UTF8StringDER(value string) []byte {
+	return der(0x0c, []byte(value))
+}
+
+func PrintableStringDER(value string) []byte {
+	return der(0x13, []byte(value))
+}
+
+func T61StringDER(value string) []byte {
+	return der(0x14, []byte(value))
 }
 
 func ExtendedKeyUsageDER(ids ...asn1.ObjectIdentifier) []byte {
@@ -287,6 +375,18 @@ func NameDER(attributes ...NameAttribute) []byte {
 		rdns = append(rdns, der(0x31, atv))
 	}
 	return der(0x30, rdns...)
+}
+
+func NameWithMultiValuedRDN(attributes ...NameAttribute) []byte {
+	atvs := make([][]byte, 0, len(attributes))
+	for _, attribute := range attributes {
+		value := attribute.RawValue
+		if value == nil {
+			value = mustMarshal(attribute.Value)
+		}
+		atvs = append(atvs, der(0x30, mustMarshal(attribute.ID), value))
+	}
+	return der(0x30, der(0x31, atvs...))
 }
 
 func DirectoryNameGeneralNameDER(name []byte) []byte {

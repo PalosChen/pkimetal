@@ -69,6 +69,7 @@ type Artifact struct {
 	TypeConflict           bool
 	Raw                    []byte
 	RawTBS                 []byte
+	Version                int
 	SerialNumber           *big.Int
 	TBSSignature           AlgorithmIdentifier
 	OuterSignature         *AlgorithmIdentifier

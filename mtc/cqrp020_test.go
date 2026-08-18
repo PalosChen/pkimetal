@@ -32,6 +32,7 @@ var cqrp020Expectations = map[string]findingExpectation{
 	"e_cqrp_subscriber_policies_critical":        {"e_cqrp_subscriber_policies_critical", Error, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.2.0", "4.5.2"},
 	"e_cqrp_subscriber_policy_identifier":        {"e_cqrp_subscriber_policy_identifier", Error, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.2.0", "4.5.2"},
 	"w_cqrp_subscriber_policy_not_dv":            {"w_cqrp_subscriber_policy_not_dv", Warning, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.2.0", "4.5.2"},
+	"w_cqrp_subscriber_policy_qualifiers":        {"w_cqrp_subscriber_policy_qualifiers", Warning, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.2.0", "4.5.2"},
 	"e_cqrp_subscriber_eku_missing":              {"e_cqrp_subscriber_eku_missing", Error, "tbsCertificate.extensions.extKeyUsage", "CQRP v0.2.0", "4.5.2"},
 	"e_cqrp_subscriber_eku_critical":             {"e_cqrp_subscriber_eku_critical", Error, "tbsCertificate.extensions.extKeyUsage", "CQRP v0.2.0", "4.5.2"},
 	"e_cqrp_subscriber_eku_only_server_auth":     {"e_cqrp_subscriber_eku_only_server_auth", Error, "tbsCertificate.extensions.extKeyUsage", "CQRP v0.2.0", "4.5.2"},
@@ -259,9 +260,30 @@ func TestCQRP020SubscriberPolicies(t *testing.T) {
 		{"IV warning", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyIV)})
 		}, []string{"w_cqrp_subscriber_policy_not_dv"}},
-		{"multiple allowed with non-DV warning", func(x *mtctest.Template) {
+		{"multiple reserved identifiers", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV, mtctest.OIDPolicyOV)})
-		}, []string{"w_cqrp_subscriber_policy_not_dv"}},
+		}, []string{"e_cqrp_subscriber_policy_identifier"}},
+		{"valid CPS qualifier is discouraged", func(x *mtctest.Template) {
+			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePolicyWithQualifierDER(
+				mtctest.OIDPolicyDV,
+				mtctest.OIDPolicyQualifierCPS,
+				mtctest.IA5StringDER("https://ca.example/cps.html"),
+			)})
+		}, []string{"w_cqrp_subscriber_policy_qualifiers"}},
+		{"unsupported policy qualifier", func(x *mtctest.Template) {
+			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePolicyWithQualifierDER(
+				mtctest.OIDPolicyDV,
+				asn1.ObjectIdentifier{1, 2, 3, 4},
+				mtctest.IA5StringDER("http://example.com"),
+			)})
+		}, []string{"e_cqrp_subscriber_policy_identifier"}},
+		{"CPS qualifier must be HTTP URL", func(x *mtctest.Template) {
+			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePolicyWithQualifierDER(
+				mtctest.OIDPolicyDV,
+				mtctest.OIDPolicyQualifierCPS,
+				mtctest.IA5StringDER("ftp://example.com"),
+			)})
+		}, []string{"e_cqrp_subscriber_policy_identifier"}},
 		{"duplicate DV policy identifier", func(x *mtctest.Template) {
 			mtctest.ReplaceExtension(x, mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV, mtctest.OIDPolicyDV)})
 		}, []string{"e_cqrp_subscriber_policy_identifier"}},
@@ -380,6 +402,9 @@ func TestCQRP020SubscriberIANAndSCT(t *testing.T) {
 		{"valid UTF8String", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x0c, 0x02, 0xc3, 0xa9}})), nil},
 		{"valid UniversalString", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x1c, 0x04, 0x00, 0x00, 0x00, 'A'}})), nil},
 		{"valid BMPString", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x1e, 0x02, 0x00, 'A'}})), nil},
+		{"invalid PrintableString character rejected", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x13, 0x01, '@'}})), []string{"e_cqrp_subscriber_ian_form"}},
+		{"misaligned UniversalString rejected", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x1c, 0x05, 0x00, 0x00, 0x00, 'A', 0x00}})), []string{"e_cqrp_subscriber_ian_form"}},
+		{"misaligned BMPString rejected", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x1e, 0x03, 0x00, 'A', 0x00}})), []string{"e_cqrp_subscriber_ian_form"}},
 		{"O INTEGER rejected", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDOrganizationName, RawValue: []byte{0x02, 0x01, 0x01}})), []string{"e_cqrp_subscriber_ian_form"}},
 		{"CN NULL rejected", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, RawValue: []byte{0x05, 0x00}})), []string{"e_cqrp_subscriber_ian_form"}},
 		{"empty O rejected", addIANName(mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDOrganizationName, RawValue: []byte{0x0c, 0x00}})), []string{"e_cqrp_subscriber_ian_form"}},

@@ -3,7 +3,9 @@ package mtc
 import (
 	"bytes"
 	"encoding/asn1"
+	"net/url"
 	"sort"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
@@ -20,6 +22,7 @@ var (
 	oidPolicyDV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 1}
 	oidPolicyOV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 2}
 	oidPolicyIV            = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 3}
+	oidPolicyQualifierCPS  = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 2, 1}
 
 	mlDSA44AlgorithmDER = []byte{0x30, 0x0b, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x11}
 	mlDSA65AlgorithmDER = []byte{0x30, 0x0b, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x12}
@@ -148,25 +151,29 @@ var cqrp020Rules = []Rule{
 			return errorFinding("tbsCertificate.extensions.certificatePolicies", "certificate policies extension is duplicated")
 		}
 		policies, ok := subscriberPolicies(a)
-		if !ok && countExtensions(a, oidCertificatePolicies) == 1 {
-			return errorFinding("tbsCertificate.extensions.certificatePolicies", "certificate policies does not contain only valid reserved policy identifiers")
+		if countExtensions(a, oidCertificatePolicies) == 1 && (!ok || len(policies) != 1 || !isAllowedSubscriberPolicy(policies[0])) {
+			return errorFinding("tbsCertificate.extensions.certificatePolicies", "certificate policies must contain exactly one valid reserved policy identifier")
 		}
-		for _, policy := range policies {
-			if !isAllowedSubscriberPolicy(policy) {
-				return errorFinding("tbsCertificate.extensions.certificatePolicies", "certificate policies contains an unrecognized policy identifier")
-			}
+		return nil
+	}),
+	cqrp020Rule("w_cqrp_subscriber_policy_qualifiers", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+		extensions := matchingExtensions(a, oidCertificatePolicies)
+		if len(extensions) != 1 {
+			return nil
+		}
+		policies, ok := parseCertificatePolicyInformation(extensions[0].Value)
+		if ok && len(policies) == 1 && policies[0].hasQualifiers && isAllowedSubscriberPolicy(policies[0].id) {
+			return warningFinding("tbsCertificate.extensions.certificatePolicies", "certificate policy qualifiers are present but not recommended")
 		}
 		return nil
 	}),
 	cqrp020Rule("w_cqrp_subscriber_policy_not_dv", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		policies, ok := allowedSubscriberPolicies(a)
-		if !ok {
+		if !ok || len(policies) != 1 {
 			return nil
 		}
-		for _, policy := range policies {
-			if !policy.Equal(oidPolicyDV) {
-				return warningFinding("tbsCertificate.extensions.certificatePolicies", "subscriber certificate asserts a reserved policy other than DV")
-			}
+		if !policies[0].Equal(oidPolicyDV) {
+			return warningFinding("tbsCertificate.extensions.certificatePolicies", "subscriber certificate asserts a reserved policy other than DV")
 		}
 		return nil
 	}),
@@ -335,12 +342,29 @@ func anyCritical(extensions []Extension) bool {
 	return false
 }
 
+type certificatePolicyInformation struct {
+	id            asn1.ObjectIdentifier
+	hasQualifiers bool
+}
+
 func parseCertificatePolicies(input []byte) ([]asn1.ObjectIdentifier, bool) {
+	information, ok := parseCertificatePolicyInformation(input)
+	if !ok {
+		return nil, false
+	}
+	policies := make([]asn1.ObjectIdentifier, 0, len(information))
+	for _, policy := range information {
+		policies = append(policies, policy.id)
+	}
+	return policies, true
+}
+
+func parseCertificatePolicyInformation(input []byte) ([]certificatePolicyInformation, bool) {
 	sequence, err := parseExactDER(input)
 	if err != nil || expectDER(sequence, classUniversal, asn1.TagSequence, true, "certificatePolicies") != nil || len(sequence.contents) == 0 {
 		return nil, false
 	}
-	var policies []asn1.ObjectIdentifier
+	var policies []certificatePolicyInformation
 	seen := make(map[string]struct{})
 	remaining := sequence.contents
 	for len(remaining) != 0 {
@@ -362,13 +386,14 @@ func parseCertificatePolicies(input []byte) ([]asn1.ObjectIdentifier, bool) {
 			return nil, false
 		}
 		seen[identifierKey] = struct{}{}
-		if len(contents) != 0 {
+		hasQualifiers := len(contents) != 0
+		if hasQualifiers {
 			qualifiers, err := takeDER(&contents, "policyQualifiers")
 			if err != nil || !validPolicyQualifiers(qualifiers) || len(contents) != 0 {
 				return nil, false
 			}
 		}
-		policies = append(policies, identifier)
+		policies = append(policies, certificatePolicyInformation{id: identifier, hasQualifiers: hasQualifiers})
 		remaining = rest
 	}
 	return policies, true
@@ -379,6 +404,7 @@ func validPolicyQualifiers(sequence derValue) bool {
 		return false
 	}
 	remaining := sequence.contents
+	seenCPS := false
 	for len(remaining) != 0 {
 		qualifier, rest, err := parseDER(remaining)
 		if err != nil || expectDER(qualifier, classUniversal, asn1.TagSequence, true, "PolicyQualifierInfo") != nil {
@@ -389,15 +415,31 @@ func validPolicyQualifiers(sequence derValue) bool {
 		if err != nil {
 			return false
 		}
-		if _, err := parseOID(qualifierID, "policyQualifierId"); err != nil {
+		identifier, err := parseOID(qualifierID, "policyQualifierId")
+		if err != nil || !identifier.Equal(oidPolicyQualifierCPS) || seenCPS {
 			return false
 		}
-		if _, err := takeDER(&contents, "qualifier"); err != nil || len(contents) != 0 {
+		seenCPS = true
+		value, err := takeDER(&contents, "qualifier")
+		if err != nil || len(contents) != 0 || !validCPSURI(value) {
 			return false
 		}
 		remaining = rest
 	}
 	return true
+}
+
+func validCPSURI(value derValue) bool {
+	if expectDER(value, classUniversal, 22, false, "CPSuri") != nil || len(value.contents) == 0 {
+		return false
+	}
+	for _, b := range value.contents {
+		if b > 0x7f {
+			return false
+		}
+	}
+	parsed, err := url.Parse(string(value.contents))
+	return err == nil && (strings.EqualFold(parsed.Scheme, "http") || strings.EqualFold(parsed.Scheme, "https")) && parsed.Hostname() != ""
 }
 
 func containsOID(oids []asn1.ObjectIdentifier, want asn1.ObjectIdentifier) bool {

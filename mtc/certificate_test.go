@@ -85,13 +85,14 @@ func TestParseValidatesCertificateVersion(t *testing.T) {
 	tests := []struct {
 		name    string
 		version byte
+		want    int
 		wantErr bool
 	}{
-		{"explicit v1 default", 0x00, true},
-		{"v2", 0x01, false},
-		{"v3", 0x02, false},
-		{"future version", 0x03, true},
-		{"negative version", 0xff, true},
+		{"explicit v1 default", 0x00, 0, true},
+		{"v2", 0x01, 2, false},
+		{"v3", 0x02, 3, false},
+		{"future version", 0x03, 0, true},
+		{"negative version", 0xff, 0, true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -101,9 +102,12 @@ func TestParseValidatesCertificateVersion(t *testing.T) {
 				t.Fatal("fixture does not contain exactly one explicit v3 version")
 			}
 			der = bytes.Replace(der, version, []byte{0xa0, 0x03, 0x02, 0x01, tc.version}, 1)
-			_, err := mtc.Parse(der, mtc.InputCertificate)
+			artifact, err := mtc.Parse(der, mtc.InputCertificate)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("Parse error = %v, wantErr %t", err, tc.wantErr)
+			}
+			if err == nil && artifact.Version != tc.want {
+				t.Fatalf("Version = %d, want %d", artifact.Version, tc.want)
 			}
 		})
 	}

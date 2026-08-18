@@ -64,6 +64,7 @@ func parseTBSCertificate(tbs derValue, artifact *Artifact) error {
 		return err
 	}
 	artifact.RawTBS = tbs.raw
+	artifact.Version = 1
 	contents := tbs.contents
 	first, err := takeDER(&contents, "version or serialNumber")
 	if err != nil {
@@ -91,6 +92,8 @@ func parseTBSCertificate(tbs derValue, artifact *Artifact) error {
 			return fmt.Errorf("unsupported TBSCertificate version %s", version)
 		case version.Sign() == 0:
 			return errors.New("explicitly encoded default TBSCertificate version v1")
+		default:
+			artifact.Version = int(version.Int64()) + 1
 		}
 		serialDER, err = takeDER(&contents, "serialNumber")
 		if err != nil {
