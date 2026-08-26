@@ -147,6 +147,7 @@ CQRP section 4.6.1.
 | `e_cqrp_subscriber_validity_too_long` | CQRP v0.2.0 | 2.1 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.validity | error | implemented |
 | `w_cqrp_subscriber_ian_name_attributes` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | warning | implemented |
 | `w_cqrp_subscriber_policy_not_dv` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | warning | implemented |
+| `w_cqrp_subscriber_policy_qualifiers` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | warning | implemented |
 
 ### Dispatcher and rule-runner findings
 
