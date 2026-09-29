@@ -1,6 +1,65 @@
 # MTC Linting Specification Baseline
 
-Last verified against upstream sources: 2026-08-19.
+## Draft-06 Capability And Retained Legacy Profile
+
+Implemented target: `draft-ietf-plants-merkle-tree-certs-06` with
+`draft-ietf-tls-trust-anchor-ids-05`. Retained compatibility profile:
+`draft-ietf-plants-merkle-tree-certs-05` with
+`draft-ietf-tls-trust-anchor-ids-04`. New admission still defaults to `05`;
+support for `06` is not an activation or deployment claim.
+
+Revision is captured at acceptance and retained for retries, workers, downloads
+and alternate artifacts. Bare proofs require explicit revision; the unchanged
+proof OID is not a discriminator. Legacy Name/extension/vector16 and TAI-04
+properties remain available; new artifacts use .47.3 RELATIVE-OID, .47.4
+three-field SHA-256 CA parameters, outer vector24 and TAI-05 patterns/properties.
+
+The same CA ID, log origin/number, hash, key identity, indexes and checkpoint
+lineage continue. Historical entries, hashes, tiles, certificates and published
+checkpoints are not rewritten. Mixed-history support does not establish that
+an unmodified strict draft-06 monitor accepts legacy entries. `/draft-06` is a
+local dual-public-view convention, not a new log or registry allocation;
+legacy URLs/landmark objects remain independent. A valid fresh 05 view may
+advance even if a later 06 publication fails.
+
+CA representations and CRL issuer/publication state are revision-separated for
+the same identity/key. Preserve old CA/CRL URLs and original artifact chains;
+47d admission needs the new CRL view, while 7d retains its no-CRL policy.
+
+Enable 06 only after durable expiration/history evidence is complete, the
+configured lifetime bound is positive, approved full CA prefixes map BEFORE
+the log number, and current registry identity, cryptographic quorum and current
+public checkpoint/document coverage pass. Missing history stays unresolved,
+never inferred from emitted_at/current configuration or fabricated as zero.
+Read-node document parsing is keyless validation, not signature verification.
+MTC-06 §6.4.3's landmark-zero/expired-sentinel row-count ambiguity returns 503
+for the new view; legacy remains available. No strict conformance claim is made
+at that boundary.
+
+Deploy additive schema and dual readers before enabling writers; backfill and
+validate history/archives/CRLs/prefixes/public views first. Rollback disables
+NEW 06 admission, retains upgraded readers/workers to finish already accepted
+06 work, and retains additive schema and committed bytes. Once 06 data exists,
+an old-binary downgrade is not supported.
+
+Runtime C2SP remains `d0fe789122c75b903bfc1680b0b8b8dc570f0db3`;
+lint C2SP remains `3bc97b2329fee167f7ff39efbbbc316c84876105`; independent
+CQRP remains `v0.2.0`. Older MTC links in pinned C2SP do not replace explicit
+revision-specific MTC structures; C2SP HTTP/signature profiles stay pinned.
+The authoritative CQRP artifact/checksum is absent, so independent CQRP-06
+policy conformance is not asserted and existing policy is not relaxed.
+
+Local codec, Merkle/vector, mixed-history, H2 migration/concurrency/restart,
+ACME, CRL and Linux Nginx route tests establish scoped implementation evidence.
+Real PostgreSQL encrypted bootstrap/decryption, migrations, rollback,
+concurrency and PostgreSQL restart are NOT EXECUTED. Production rollout,
+actual registry/HSM and external TLS/RP/monitor interoperability are unverified.
+Existing signer baseline failures and environment-gated skips remain failures
+and unverified evidence respectively, not an all-green claim.
+
+
+Upstream snapshot for unchanged policies: 2026-08-19.
+MTC/TAI implementation capability updated: 2026-09-28; see limits below.
 
 The versions below are pinned. Upstream publication does not upgrade this
 repository automatically.
@@ -9,14 +68,14 @@ repository automatically.
 
 | Specification | Pinned baseline | Lint scope | Source |
 | --- | --- | --- | --- |
-| Merkle Tree Certificates | `draft-ietf-plants-merkle-tree-certs-05` | MTC CA and subscriber syntax/profile rules | https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05 |
-| TLS Trust Anchor Identifiers | `draft-ietf-tls-trust-anchor-ids-04` | Relative OID and Trust Anchor ID syntax | https://datatracker.ietf.org/doc/html/draft-ietf-tls-trust-anchor-ids-04 |
+| Merkle Tree Certificates | `draft-ietf-plants-merkle-tree-certs-06` | MTC CA and subscriber syntax/profile rules | https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06 |
+| TLS Trust Anchor Identifiers | `draft-ietf-tls-trust-anchor-ids-05` | Relative OID and Trust Anchor ID syntax | https://datatracker.ietf.org/doc/html/draft-ietf-tls-trust-anchor-ids-05 |
 | Unsigned X.509 Certificates | RFC 9925 | Conditional unsigned CA-certificate rules | https://www.rfc-editor.org/rfc/rfc9925.html |
 | ML-DSA Algorithm Identifiers for PKIX | RFC 9881 | AlgorithmIdentifier and OID checks | https://www.rfc-editor.org/rfc/rfc9881.html |
 | PKIX Certificate and CRL Profile | RFC 5280 | Compatible X.509 certificate and CRL rules | https://www.rfc-editor.org/rfc/rfc5280.html |
 | TLS Baseline Requirements | CA/B Forum TLS BR `2.2.8`, effective 2026-06-16 | Compatible publicly trusted TLS certificate rules | https://cabforum.org/working-groups/server/baseline-requirements/documents/CA-Browser-Forum-TLS-BR-2.2.8.pdf |
 
-MTC `-05` overrides RFC 5280 only where explicit. Compatible RFC 5280 and TLS
+Selected MTC revision (`-05` legacy or `-06` new) overrides RFC 5280 only where explicit. Compatible RFC 5280 and TLS
 BR rules remain applicable and may be delegated to registered general-purpose
 linters when they can safely parse the artifact.
 

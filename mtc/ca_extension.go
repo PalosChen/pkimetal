@@ -14,6 +14,13 @@ const (
 )
 
 func ParseCAIDName(input []byte) ([]byte, error) {
+	return ParseCAIDNameForRevision(input, "05")
+}
+
+func ParseCAIDNameForRevision(input []byte, revision string) ([]byte, error) {
+	if revision != "05" && revision != "06" {
+		return nil, fmt.Errorf("unsupported MTC revision %q", revision)
+	}
 	root, err := parseExactDER(append([]byte(nil), input...))
 	if err != nil {
 		return nil, fmt.Errorf("parse CA-ID Name: %w", err)
@@ -52,18 +59,32 @@ func ParseCAIDName(input []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !oid.Equal(OIDCAID) {
+	expectedOID := OIDCAID
+	if revision == "06" {
+		expectedOID = OIDCAIDDraft06
+	}
+	if !oid.Equal(expectedOID) {
 		return nil, errors.New("Name attribute is not id-rdna-trustAnchorID")
 	}
 	caID, err := takeDER(&attribute, "CA-ID attribute value")
 	if err != nil {
 		return nil, err
 	}
-	if err := expectDER(caID, classUniversal, asn1.TagUTF8String, false, "CA-ID attribute value"); err != nil {
+	expectedTag := asn1.TagUTF8String
+	if revision == "06" {
+		expectedTag = tagRelativeOID
+	}
+	if err := expectDER(caID, classUniversal, expectedTag, false, "CA-ID attribute value"); err != nil {
 		return nil, err
 	}
 	if err := noRemainingDER(attribute, "CA-ID attribute"); err != nil {
 		return nil, err
+	}
+	if revision == "06" {
+		if !validTrustAnchorIDBinary(caID.contents) {
+			return nil, errors.New("invalid binary CA ID")
+		}
+		return append([]byte(nil), caID.contents...), nil
 	}
 	return encodeRelativeOID(caID.contents)
 }
@@ -148,6 +169,13 @@ func appendBase128(output []byte, value *big.Int) []byte {
 }
 
 func ParseCertificationAuthorityExtension(input []byte) (*CertificationAuthority, error) {
+	return ParseCertificationAuthorityExtensionForRevision(input, "05")
+}
+
+func ParseCertificationAuthorityExtensionForRevision(input []byte, revision string) (*CertificationAuthority, error) {
+	if revision != "05" && revision != "06" {
+		return nil, fmt.Errorf("unsupported MTC revision %q", revision)
+	}
 	root, err := parseExactDER(append([]byte(nil), input...))
 	if err != nil {
 		return nil, fmt.Errorf("parse MTC CA extension: %w", err)
@@ -156,13 +184,16 @@ func ParseCertificationAuthorityExtension(input []byte) (*CertificationAuthority
 		return nil, err
 	}
 	contents := root.contents
-	logHashDER, err := takeDER(&contents, "logHash")
-	if err != nil {
-		return nil, err
-	}
-	logHash, err := parseAlgorithmIdentifier(logHashDER)
-	if err != nil {
-		return nil, fmt.Errorf("parse logHash: %w", err)
+	logHash := AlgorithmIdentifier{Algorithm: OIDSHA256}
+	if revision == "05" {
+		logHashDER, err := takeDER(&contents, "logHash")
+		if err != nil {
+			return nil, err
+		}
+		logHash, err = parseAlgorithmIdentifier(logHashDER)
+		if err != nil {
+			return nil, fmt.Errorf("parse logHash: %w", err)
+		}
 	}
 	sigAlgDER, err := takeDER(&contents, "sigAlg")
 	if err != nil {

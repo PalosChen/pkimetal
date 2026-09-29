@@ -6,10 +6,13 @@ import (
 )
 
 func ValidSubtree(start, end uint64) bool {
-	if start >= end || end > (1<<48)-1 {
+	if start > end || end > (1<<48)-1 {
 		return false
 	}
 	width := end - start
+	if width == 0 {
+		return true
+	}
 	ceil := uint64(1) << bits.Len64(width-1)
 	return start%ceil == 0
 }

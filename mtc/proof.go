@@ -26,10 +26,42 @@ func (e *ProofTrailingDataError) Error() string {
 	return fmt.Sprintf("MTCProof has %d trailing bytes", e.Remaining)
 }
 
+// ProofCosignerOrderError reports signatures that violate draft-06 section 6.2.
+// The parsed proof is retained with this error for diagnostic linting only.
+type ProofCosignerOrderError struct {
+	Index int
+}
+
+func (e *ProofCosignerOrderError) Error() string {
+	return fmt.Sprintf("MTCProof cosigner IDs are not strictly increasing at signature %d", e.Index)
+}
+
 // ParseProof decodes the TLS presentation-language encoding of an MTCProof.
 // It intentionally performs only syntax parsing; canonical ordering, duplicate
 // detection, and other semantic checks belong to the lint rules.
 func ParseProof(input []byte) (*Proof, error) {
+	return parseProof(input, "05")
+}
+
+func ParseProofForRevision(input []byte, revision string) (*Proof, error) {
+	if revision != "05" && revision != "06" {
+		return nil, fmt.Errorf("unsupported MTC revision %q", revision)
+	}
+	proof, err := parseProof(input, revision)
+	if err == nil && revision == "06" && proof.Start >= proof.End {
+		return nil, fmt.Errorf("MTCProof subtree must be nonempty")
+	}
+	if err == nil && revision == "06" {
+		for i := 1; i < len(proof.Signatures); i++ {
+			if compareCosignerIDs(proof.Signatures[i-1].CosignerID, proof.Signatures[i].CosignerID) >= 0 {
+				return proof, &ProofCosignerOrderError{Index: i}
+			}
+		}
+	}
+	return proof, err
+}
+
+func parseProof(input []byte, revision string) (*Proof, error) {
 	reader := proofReader{remaining: input}
 	extensionsBytes, err := reader.vector16("extensions")
 	if err != nil {
@@ -51,7 +83,12 @@ func ParseProof(input []byte) (*Proof, error) {
 	if err != nil {
 		return nil, err
 	}
-	signaturesBytes, err := reader.vector16("signatures")
+	var signaturesBytes []byte
+	if revision == "06" {
+		signaturesBytes, err = reader.vector24("signatures")
+	} else {
+		signaturesBytes, err = reader.vector16("signatures")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -134,6 +171,14 @@ func (r *proofReader) vector16(field string) ([]byte, error) {
 		return nil, err
 	}
 	return r.take(int(binary.BigEndian.Uint16(lengthBytes)), field)
+}
+
+func (r *proofReader) vector24(field string) ([]byte, error) {
+	encoded, err := r.take(3, field+" length")
+	if err != nil {
+		return nil, err
+	}
+	return r.take(int(encoded[0])<<16|int(encoded[1])<<8|int(encoded[2]), field)
 }
 
 func (r *proofReader) uint48(field string) (uint64, error) {

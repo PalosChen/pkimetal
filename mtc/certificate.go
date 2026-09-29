@@ -54,7 +54,11 @@ func Parse(input []byte, kind InputKind) (*Artifact, error) {
 	}
 	classifyArtifact(artifact)
 	if artifact.InputKind == InputCertificate && artifact.Kind == ArtifactSubscriber {
-		artifact.Proof, artifact.ProofParseError = ParseProof(artifact.SignatureValue)
+		if artifact.RevisionError != nil {
+			artifact.ProofParseError = artifact.RevisionError
+		} else {
+			artifact.Proof, artifact.ProofParseError = ParseProofForRevision(artifact.SignatureValue, artifact.Revision)
+		}
 	}
 	return artifact, nil
 }
@@ -120,7 +124,6 @@ func parseTBSCertificate(tbs derValue, artifact *Artifact) error {
 		return err
 	}
 	artifact.IssuerRaw = issuer.raw
-	artifact.IssuerCAID, _ = ParseCAIDName(issuer.raw)
 	validity, err := takeDER(&contents, "validity")
 	if err != nil {
 		return err
@@ -137,7 +140,6 @@ func parseTBSCertificate(tbs derValue, artifact *Artifact) error {
 		return err
 	}
 	artifact.SubjectRaw = subject.raw
-	artifact.SubjectCAID, _ = ParseCAIDName(subject.raw)
 	spki, err := takeDER(&contents, "subjectPublicKeyInfo")
 	if err != nil {
 		return err
@@ -341,27 +343,113 @@ func parseImplicitBitString(value derValue, field string) ([]byte, int, error) {
 }
 
 func classifyArtifact(artifact *Artifact) {
+	subjectRevision, subjectConflict := caIDNameRevision(artifact.SubjectRaw)
+	issuerRevision, issuerConflict := caIDNameRevision(artifact.IssuerRaw)
+	if subjectRevision != "" {
+		artifact.SubjectCAID, _ = ParseCAIDNameForRevision(artifact.SubjectRaw, subjectRevision)
+	}
+	if issuerRevision != "" {
+		artifact.IssuerCAID, _ = ParseCAIDNameForRevision(artifact.IssuerRaw, issuerRevision)
+	}
+	evidence := func(revision string) {
+		if revision == "" {
+			return
+		}
+		if artifact.Revision != "" && artifact.Revision != revision {
+			artifact.RevisionError = fmt.Errorf("conflicting MTC revision evidence")
+		}
+		if artifact.Revision == "" {
+			artifact.Revision = revision
+		}
+	}
 	var caExtensionValue []byte
 	caExtensionCount := 0
 	for _, extension := range artifact.Extensions {
-		if !extension.ID.Equal(OIDMTCCertificationAuthority) {
+		if !extension.ID.Equal(OIDMTCCertificationAuthority) && !extension.ID.Equal(OIDMTCCertificationAuthorityDraft06) {
 			continue
 		}
 		caExtensionCount++
+		if extension.ID.Equal(OIDMTCCertificationAuthorityDraft06) {
+			evidence("06")
+		} else {
+			evidence("05")
+		}
 		caExtensionValue = extension.Value
 	}
 	artifact.TypeConflict = caExtensionCount != 0 && artifact.TBSSignature.Algorithm.Equal(OIDMTCProof)
 	if caExtensionCount != 0 {
 		artifact.Kind = ArtifactCA
+		evidence(subjectRevision)
+		if subjectConflict {
+			artifact.RevisionError = fmt.Errorf("conflicting CA subject OIDs")
+		}
+		artifact.SubjectCAID, _ = ParseCAIDNameForRevision(artifact.SubjectRaw, artifact.Revision)
 		if caExtensionCount == 1 {
-			artifact.CAParameters, artifact.CAExtensionError = ParseCertificationAuthorityExtension(caExtensionValue)
+			if artifact.RevisionError != nil {
+				artifact.CAExtensionError = artifact.RevisionError
+			} else {
+				artifact.CAParameters, artifact.CAExtensionError = ParseCertificationAuthorityExtensionForRevision(caExtensionValue, artifact.Revision)
+			}
 		} else {
 			artifact.CAParameters = nil
 			artifact.CAExtensionError = fmt.Errorf("duplicate MTC CA extensions: found %d", caExtensionCount)
 		}
 		return
 	}
-	if len(artifact.IssuerCAID) != 0 || artifact.TBSSignature.Algorithm.Equal(OIDMTCProof) {
+	evidence(issuerRevision)
+	if issuerConflict {
+		artifact.RevisionError = fmt.Errorf("conflicting subscriber issuer OIDs")
+	}
+	if issuerRevision != "" {
+		artifact.IssuerCAID, _ = ParseCAIDNameForRevision(artifact.IssuerRaw, artifact.Revision)
+	}
+	if issuerRevision != "" || artifact.TBSSignature.Algorithm.Equal(OIDMTCProof) {
 		artifact.Kind = ArtifactSubscriber
 	}
+}
+
+// OID evidence is independent of the attribute value's profile validity.
+func caIDNameRevision(input []byte) (string, bool) {
+	root, _, err := parseDER(input)
+	if err != nil {
+		return "", false
+	}
+	revision := ""
+	remaining := root.contents
+	for len(remaining) > 0 {
+		rdn, err := takeDER(&remaining, "RDN")
+		if err != nil {
+			break
+		}
+		attrs := rdn.contents
+		for len(attrs) > 0 {
+			attr, err := takeDER(&attrs, "attribute")
+			if err != nil {
+				break
+			}
+			fields := attr.contents
+			oidDER, err := takeDER(&fields, "attribute OID")
+			if err != nil {
+				continue
+			}
+			oid, err := parseOID(oidDER, "attribute OID")
+			if err != nil {
+				continue
+			}
+			found := ""
+			if oid.Equal(OIDCAID) {
+				found = "05"
+			}
+			if oid.Equal(OIDCAIDDraft06) {
+				found = "06"
+			}
+			if found != "" {
+				if revision != "" && revision != found {
+					return revision, true
+				}
+				revision = found
+			}
+		}
+	}
+	return revision, false
 }

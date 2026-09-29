@@ -1,12 +1,65 @@
 # MTC and CQRP rule coverage
 
-This fork implements experimental Merkle Tree Certificate (MTC) linting against
+This fork implements explicit draft-06 and retained draft-05 experimental MTC linting.
+Profiles 105-108 retain their names and meanings; 109 is `mtc_draft06_ca` and
+110 is `mtc_draft06_subscriber`. Complete certificates and TBS artifacts are
+supported; proof/outer-certificate rules do not apply to TBS inputs. The legacy
+matrix below remains the retained draft-05/CQRP baseline, not a draft-06 claim.
+
+The retained profile implements Merkle Tree Certificate (MTC) linting against
 [draft-ietf-plants-merkle-tree-certs-05](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05),
 the unsigned-certificate requirements in [RFC 9925](https://www.rfc-editor.org/rfc/rfc9925.html),
 and a user-supplied local CQRP v0.2.0 draft baseline. The CQRP baseline is not a
 reference to a later or generic MTC Internet-Draft.
 
 ## Profiles and precedence
+
+### Draft-06 profiles
+
+`mtc_draft06_ca` and `mtc_draft06_subscriber` are appended profile IDs for
+`draft-ietf-plants-merkle-tree-certs-06` and
+`draft-ietf-tls-trust-anchor-ids-05`. The legacy profile names/IDs and the
+finding metadata in the legacy matrix below are unchanged. Shared rules use
+the draft-06 source and the same applicable section; the binary Trust Anchor
+ID check cites TAI-05 section 4 instead of TAI-04 section 3.
+
+The CA identity uses `.47.3` with DER RELATIVE-OID (MTC-06 section 5.1).
+The critical `.47.4` extension carries only `sigAlg`, `minSerial`, and
+`maxSerial`; SHA-256 is selected by its OID, and serial bounds start at
+2^48 (section 5.5). Proof signatures use a vector24 outer length (section 6.2).
+The unchanged `.47.0` signature OID alone does not identify a revision.
+Autodetection selects by unambiguous identity OIDs, never by framing or keys.
+Malformed recognized extension bodies remain available to native linting;
+invalid DER is rejected. Conflicting revision evidence is not autodetected.
+
+Additional draft-06 findings:
+
+- `e_mtc_profile_revision_mismatch`: error, profile field, sections 5.1 and
+  5.5; conflicting or wrong revision under an explicit profile. Legacy/CQRP
+  selections use the dispatch source and retain independent CQRP findings.
+- `e_mtc_serial_index_outside_wire_domain`: error, serialNumber, sections
+  5.2 and 6.2; rejects the final uint48 value as an entry index. Certificate
+  and TBS subscriber inputs only.
+- `e_mtc_entry_too_large`: error, tbsCertificate, section 5.2.1; reconstructed
+  entry contents exceed 65,535 bytes. Certificate and TBS subscriber inputs
+  only. TBS supplies only a lower bound because entry extensions are absent;
+  no pass claim is made for their unseen contents.
+
+The generic subtree helper accepts empty `[x,x)` intervals in the uint48
+domain (section 4.1); a certificate proof still must contain a nonempty
+subtree with its index (sections 4.3.2 and 6.2).
+The pinned C2SP profile and CQRP v0.2.0 are not upgraded. C2SP's old explicit
+`logHash` structure is superseded only by the project's selected MTC-06
+encoding: its SHA-256 requirement is checked against the `.47.4` OID-derived
+hash. CQRP profiles remain legacy-only and report revision mismatch for
+draft-06 instead of asserting unverified CQRP compatibility.
+
+Compatible zlint checks retain the existing MTC non-CABF filtering and skip
+when zcrypto cannot parse the certificate. No external log-state, trusted-root,
+cosignature, registry-ownership, landmark-expiration or online verification
+is inferred by these structural lints.
+
+### Legacy and CQRP profiles
 
 The explicit profiles are `mtc_ca`, `mtc_subscriber`, `cqrp_mtc_ca`, and
 `cqrp_mtc_subscriber`. The two CQRP profiles run both `mtclint` for the draft-05

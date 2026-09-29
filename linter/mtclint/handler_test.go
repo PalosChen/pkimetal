@@ -2,7 +2,10 @@ package mtclint
 
 import (
 	"context"
+	"encoding/pem"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"testing"
@@ -24,17 +27,17 @@ func TestRegistration(t *testing.T) {
 		t.Fatalf("mtclint registrations = %d, want 1", len(registered))
 	}
 	got := registered[0]
-	if got.Version != "draft-05" {
-		t.Errorf("version = %q, want draft-05", got.Version)
+	if got.Version != "draft-05/draft-06" {
+		t.Errorf("version = %q, want draft-05/draft-06", got.Version)
 	}
-	if got.Url != "https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05" {
+	if got.Url != "https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06" {
 		t.Errorf("URL = %q", got.Url)
 	}
 	if got.NumInstances != 1 {
 		t.Errorf("instances = %d, want 1", got.NumInstances)
 	}
 
-	supported := []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER}
+	supported := []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER}
 	if !slices.Equal(got.Supported, supported) {
 		t.Errorf("supported = %#v, want %#v", got.Supported, supported)
 	}
@@ -42,6 +45,75 @@ func TestRegistration(t *testing.T) {
 		if gotSupported := got.Supports(id); gotSupported != slices.Contains(supported, id) {
 			t.Errorf("profile %s supported = %t", linter.AllProfiles[id].Name, gotSupported)
 		}
+	}
+}
+
+func TestDraft06WrongRevisionProfiles(t *testing.T) {
+	legacy := parseArtifact(t, mtctest.ValidSubscriberTemplate(), mtc.InputCertificate)
+	assertHasCode(t, handle(t, linter.MTC_DRAFT06_SUBSCRIBER, legacy), "e_mtc_profile_revision_mismatch")
+	tpl := mtctest.ValidDraft06SubscriberTemplate()
+	current := parseArtifact(t, tpl, mtc.InputCertificate)
+	if got := handle(t, linter.MTC_DRAFT06_SUBSCRIBER, current); len(got) != 0 {
+		t.Fatal(got)
+	}
+	assertHasCode(t, handle(t, linter.MTC_SUBSCRIBER, current), "e_mtc_profile_revision_mismatch")
+	assertHasCode(t, handle(t, linter.CQRP_MTC_SUBSCRIBER, current), "e_mtc_profile_revision_mismatch")
+	assertHasCode(t, handle(t, linter.MTC_DRAFT06_CA, current), "e_mtc_profile_artifact_mismatch")
+}
+
+func TestExportedRevisionFixturesUseTheirExplicitProfiles(t *testing.T) {
+	for _, tc := range []struct {
+		file    string
+		profile linter.ProfileId
+		kind    mtc.InputKind
+	}{
+		{"draft05-ca.pem", linter.MTC_CA, mtc.InputCertificate},
+		{"draft05-subscriber-tbs.pem", linter.MTC_SUBSCRIBER, mtc.InputTBSCertificate},
+		{"draft06-ca.pem", linter.MTC_DRAFT06_CA, mtc.InputCertificate},
+		{"draft06-standalone.pem", linter.MTC_DRAFT06_SUBSCRIBER, mtc.InputCertificate},
+		{"draft06-landmark.pem", linter.MTC_DRAFT06_SUBSCRIBER, mtc.InputCertificate},
+		{"draft06-subscriber-tbs.pem", linter.MTC_DRAFT06_SUBSCRIBER, mtc.InputTBSCertificate},
+	} {
+		t.Run(tc.file, func(t *testing.T) {
+			data, err := os.ReadFile(filepath.Join("..", "..", "mtc", "testdata", tc.file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			block, rest := pem.Decode(data)
+			if block == nil || len(rest) != 0 {
+				t.Fatal("expected one exported DER artifact")
+			}
+			artifact, err := mtc.Parse(block.Bytes, tc.kind)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if findings := handle(t, tc.profile, artifact); len(findings) != 0 {
+				t.Fatalf("explicit %s findings: %#v", linter.AllProfiles[tc.profile].Name, findings)
+			}
+		})
+	}
+}
+
+func TestDraft06CosignerParserRejectionsKeepSpecificFindings(t *testing.T) {
+	for _, tc := range []struct {
+		ids  [][]byte
+		code string
+	}{
+		{[][]byte{{1}, {1}}, "e_mtc_proof_cosigner_duplicate"},
+		{[][]byte{{2}, {1}}, "e_mtc_proof_cosigner_order"},
+		{[][]byte{{0, 0}, {2}}, "e_mtc_proof_cosigner_order"},
+	} {
+		tpl := mtctest.ValidDraft06SubscriberTemplate()
+		proof := mtctest.Proof{Start: 0, End: 8}
+		for _, id := range tc.ids {
+			proof.Signatures = append(proof.Signatures, mtctest.ProofSignature{CosignerID: id, Signature: []byte{7}})
+		}
+		tpl.Signature = mtctest.ProofBytesForRevision(proof, "06")
+		artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+		if artifact.ProofParseError == nil {
+			t.Fatal("certificate parse did not retain parser rejection")
+		}
+		assertHasCode(t, handle(t, linter.MTC_DRAFT06_SUBSCRIBER, artifact), tc.code)
 	}
 }
 

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-var mtcProfiles = []ProfileId{MTC_CA, MTC_SUBSCRIBER, CQRP_MTC_CA, CQRP_MTC_SUBSCRIBER}
+var mtcProfiles = []ProfileId{MTC_CA, MTC_SUBSCRIBER, CQRP_MTC_CA, CQRP_MTC_SUBSCRIBER, MTC_DRAFT06_CA, MTC_DRAFT06_SUBSCRIBER}
 
 func TestIsMTCProfile(t *testing.T) {
 	for _, profile := range mtcProfiles {
@@ -13,7 +13,7 @@ func TestIsMTCProfile(t *testing.T) {
 			t.Errorf("IsMTCProfile(%v) = false", profile)
 		}
 	}
-	for _, profile := range []ProfileId{AUTODETECT, RFC5280_ROOT, BIMIGROUP_LEAF_VERIFIEDMARK_PRECERTIFICATE, -1, CQRP_MTC_SUBSCRIBER + 1} {
+	for _, profile := range []ProfileId{AUTODETECT, RFC5280_ROOT, BIMIGROUP_LEAF_VERIFIEDMARK_PRECERTIFICATE, -1, MTC_DRAFT06_SUBSCRIBER + 1} {
 		if IsMTCProfile(profile) {
 			t.Errorf("IsMTCProfile(%v) = true", profile)
 		}

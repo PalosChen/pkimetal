@@ -1,5 +1,14 @@
 # Repository Collaboration Rules
 
+## Revision Selection
+
+Before changing MTC/TAI behavior, read this repository's `SPECIFICATIONS.md`.
+Apply MTC-06/TAI-05 only to explicitly selected 06 artifacts; retain the pinned
+MTC-05/TAI-04 legacy paths and default 05 admission. Follow the documented
+activation/rollback gates; preserve independent C2SP/CQRP pins and report
+unverified integration or the landmark-zero sentinel ambiguity explicitly.
+
+
 ## Specification Compliance
 
 - Read `SPECIFICATIONS.md` before changing MTC parsing, profile selection,

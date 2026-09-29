@@ -20,9 +20,9 @@ func TestMTCPolicyLintersRegisterPublicMetadata(t *testing.T) {
 	}{
 		{
 			name:             "mtclint",
-			formattedVersion: "draft-05",
-			url:              "https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05",
-			supported:        []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER},
+			formattedVersion: "draft-05/draft-06",
+			url:              "https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06",
+			supported:        []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER},
 		},
 		{
 			name:             "cqrplint",
@@ -33,7 +33,7 @@ func TestMTCPolicyLintersRegisterPublicMetadata(t *testing.T) {
 		{
 			name:      "zlint",
 			url:       "https://github.com/zmap/zlint",
-			supported: []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER},
+			supported: []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER},
 			allLegacy: true,
 		},
 	}

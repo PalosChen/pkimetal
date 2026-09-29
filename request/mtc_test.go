@@ -55,6 +55,49 @@ func TestMTCProfileMetadataAndClassification(t *testing.T) {
 	}
 }
 
+func TestDraft06RequestAutodetection(t *testing.T) {
+	for _, tpl := range []mtctest.Template{mtctest.ValidDraft06CATemplate(), mtctest.ValidDraft06SubscriberTemplate()} {
+		for _, kind := range []mtc.InputKind{mtc.InputCertificate, mtc.InputTBSCertificate} {
+			der := mtctest.Certificate(tpl)
+			if kind == mtc.InputTBSCertificate {
+				der = mtctest.TBSCertificate(tpl)
+			}
+			_, cert, a, err := parseCertificateBytes(der, kind, x509.ParseCertificate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ri := &RequestInfo{mtcArtifact: a, cert: cert, endpoint: ENDPOINT_LINTCERT}
+			want := linter.MTC_DRAFT06_SUBSCRIBER
+			if a.Kind == mtc.ArtifactCA {
+				want = linter.MTC_DRAFT06_CA
+			}
+			if !ri.GetProfile("autodetect") || ri.profileId != want {
+				t.Fatalf("profile=%v want=%v", ri.profileId, want)
+			}
+		}
+	}
+	tpl := mtctest.ValidDraft06CATemplate()
+	tpl.Subject = mtctest.ValidCAIDNameDER()
+	a, err := mtc.Parse(mtctest.Certificate(tpl), mtc.InputCertificate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ri := &RequestInfo{mtcArtifact: a, endpoint: ENDPOINT_LINTCERT}
+	if ri.GetProfile("autodetect") {
+		t.Fatal("conflicting revision autodetected")
+	}
+	tpl = mtctest.ValidDraft06SubscriberTemplate()
+	tpl.Issuer = mtctest.NameDER(mtctest.NameAttribute{ID: mtctest.OIDCommonName, Value: "ordinary CA"})
+	a, err = mtc.Parse(mtctest.Certificate(tpl), mtc.InputCertificate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ri = &RequestInfo{mtcArtifact: a, endpoint: ENDPOINT_LINTCERT}
+	if ri.GetProfile("autodetect") {
+		t.Fatal("versionless MTC signature OID autodetected as a revision")
+	}
+}
+
 func TestParseCertificateBytesRecognizedMTCRetainsLegacyCertificateWhenAvailable(t *testing.T) {
 	for _, tc := range []struct {
 		name      string

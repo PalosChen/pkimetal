@@ -198,12 +198,24 @@ func (ri *RequestInfo) GetProfile(profileName string) bool {
 	// Perform profile autodetection, if necessary.
 	if ri.profileId == linter.AUTODETECT {
 		if ri.mtcArtifact != nil {
+			if ri.mtcArtifact.RevisionError != nil {
+				return false
+			}
+			if ri.mtcArtifact.Kind != mtc.ArtifactUnknown && ri.mtcArtifact.Revision == "" {
+				return false
+			}
 			switch ri.mtcArtifact.Kind {
 			case mtc.ArtifactCA:
 				ri.profileId = linter.MTC_CA
+				if ri.mtcArtifact.Revision == "06" {
+					ri.profileId = linter.MTC_DRAFT06_CA
+				}
 				return true
 			case mtc.ArtifactSubscriber:
 				ri.profileId = linter.MTC_SUBSCRIBER
+				if ri.mtcArtifact.Revision == "06" {
+					ri.profileId = linter.MTC_DRAFT06_SUBSCRIBER
+				}
 				return true
 			}
 		}

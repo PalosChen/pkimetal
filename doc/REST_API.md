@@ -62,7 +62,9 @@ Browse (i.e., send a GET request) to any of the POST endpoints.
 
 ## Experimental MTC certificate API
 
-This fork supports [MTC draft-05](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05)
+This fork supports [MTC draft-06](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06)
+with TAI-05 and retained [MTC draft-05](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05)
+with TAI-04,
 and a separate, user-supplied CQRP v0.2.0 local draft baseline on the existing
 certificate endpoints. See [MTC and CQRP rule coverage](MTC_RULE_COVERAGE.md)
 for the implemented rules and offline limitations.
@@ -75,9 +77,17 @@ Profile | Artifact | Native linters
 `mtc_subscriber` | MTC subscriber Certificate or TBSCertificate | `mtclint` draft-05
 `cqrp_mtc_ca` | CQRP MTC CA cosigning Certificate or TBSCertificate | `mtclint` draft-05 and `cqrplint` v0.2.0
 `cqrp_mtc_subscriber` | CQRP MTC subscriber TLS Certificate or TBSCertificate | `mtclint` draft-05 and `cqrplint` v0.2.0
+`mtc_draft06_ca` | Draft-06 CA Certificate or TBSCertificate | `mtclint` draft-06 / TAI-05
+`mtc_draft06_subscriber` | Draft-06 subscriber Certificate or TBSCertificate | `mtclint` draft-06 / TAI-05
+
+Profile IDs 105-108 retain their names/semantics; new draft-06 IDs are 109-110.
+CQRP v0.2.0 stays independent: its authoritative artifact/checksum is missing,
+and draft-06 CQRP compatibility is not asserted. Local linting is not evidence
+of log/quorum/registry state, deployment or external TLS/RP interoperability.
 
 An explicit profile is authoritative. CQRP is never inferred: an omitted
-profile or `profile=autodetect` can select `mtc_ca` or `mtc_subscriber`, but
+profile or `profile=autodetect` can select the CA/subscriber profile matching
+unambiguous draft-05 or draft-06 identity, but
 never either CQRP profile. If an explicit CA/subscriber profile conflicts with
 the detected artifact kind, the HTTP request still succeeds and `mtclint`
 returns an `e_mtc_profile_artifact_mismatch` error finding.

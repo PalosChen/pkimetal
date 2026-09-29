@@ -136,6 +136,24 @@ func ValidSubscriberTemplate() Template {
 	}
 }
 
+func ValidDraft06SubscriberTemplate() Template {
+	tpl := ValidSubscriberTemplate()
+	tpl.Issuer = NameDER(NameAttribute{ID: asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 3}, RawValue: der(13, ValidCAID())})
+	tpl.Signature = ProofBytesForRevision(ValidProof(), "06")
+	return tpl
+}
+
+func ValidDraft06CATemplate() Template {
+	tpl := ValidCATemplate()
+	tpl.Subject = ValidDraft06SubscriberTemplate().Issuer
+	tpl.Extensions[0] = Extension{ID: asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 4}, Critical: true, Value: Draft06CAExtensionDER(Algorithm{OID: OIDMLDSA65}, new(big.Int).Lsh(big.NewInt(1), 48), new(big.Int).SetUint64(1<<48|99))}
+	return tpl
+}
+
+func Draft06CAExtensionDER(signatureAlgorithm Algorithm, minSerial, maxSerial *big.Int) []byte {
+	return der(0x30, algorithmIdentifier(signatureAlgorithm), integer(minSerial), integer(maxSerial))
+}
+
 func ValidCQRPSubscriberTemplate() Template {
 	tpl := ValidSubscriberTemplate()
 	tpl.Extensions = append(tpl.Extensions,
@@ -176,6 +194,13 @@ func ValidProof() Proof {
 }
 
 func ProofBytes(proof Proof) []byte {
+	return ProofBytesForRevision(proof, "05")
+}
+
+func ProofBytesForRevision(proof Proof, revision string) []byte {
+	if revision != "05" && revision != "06" {
+		panic("unsupported revision")
+	}
 	var extensions bytes.Buffer
 	for _, extension := range proof.Extensions {
 		writeUint16(&extensions, extension.Type)
@@ -197,7 +222,16 @@ func ProofBytes(proof Proof) []byte {
 	writeUint48(&encoded, proof.Start)
 	writeUint48(&encoded, proof.End)
 	writeVector16(&encoded, proof.InclusionProof)
-	writeVector16(&encoded, signatures.Bytes())
+	if revision == "06" {
+		n := signatures.Len()
+		if n > 1<<24-1 {
+			panic("signatures exceeds vector24")
+		}
+		encoded.Write([]byte{byte(n >> 16), byte(n >> 8), byte(n)})
+		encoded.Write(signatures.Bytes())
+	} else {
+		writeVector16(&encoded, signatures.Bytes())
+	}
 	return encoded.Bytes()
 }
 
@@ -477,6 +511,24 @@ func CAExtensionDER(logHash, signatureAlgorithm Algorithm, minSerial, maxSerial 
 		integer(minSerial),
 		integer(maxSerial),
 	)
+}
+
+func WriteDraft06Fixtures(dir string) error {
+	tpl := ValidDraft06SubscriberTemplate()
+	standalone := tpl
+	standalone.Signature = ProofBytesForRevision(Proof{Start: 0, End: 8, Signatures: []ProofSignature{{CosignerID: ValidCAID(), Signature: []byte{1, 2, 3}}}}, "06")
+	fixtures := map[string]*pem.Block{
+		"draft06-ca.pem":             {Type: "CERTIFICATE", Bytes: Certificate(ValidDraft06CATemplate())},
+		"draft06-standalone.pem":     {Type: "CERTIFICATE", Bytes: Certificate(standalone)},
+		"draft06-landmark.pem":       {Type: "CERTIFICATE", Bytes: Certificate(tpl)},
+		"draft06-subscriber-tbs.pem": {Type: "TBS CERTIFICATE", Bytes: TBSCertificate(tpl)},
+	}
+	for name, block := range fixtures {
+		if err := os.WriteFile(filepath.Join(dir, name), pem.EncodeToMemory(block), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func WriteGeneratedFixtures(dir string) error {

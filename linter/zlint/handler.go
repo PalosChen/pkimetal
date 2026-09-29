@@ -46,7 +46,7 @@ func init() {
 		Name:         "zlint",
 		Version:      linter.GetPackageVersion("github.com/zmap/zlint"),
 		Url:          "https://github.com/zmap/zlint",
-		Supported:    []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER},
+		Supported:    []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER},
 		Unsupported:  nil,
 		Applicable:   zlintApplicable,
 		NumInstances: config.Config.Linter.Zlint.NumGoroutines,
@@ -221,7 +221,7 @@ func registryForProfile(profile linter.ProfileId) lint.Registry {
 	switch profile {
 	case linter.CQRP_MTC_SUBSCRIBER:
 		return cqrpMTCLeafRegistry
-	case linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA:
+	case linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER:
 		return mtcNonCABFRegistry
 	}
 

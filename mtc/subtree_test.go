@@ -19,7 +19,7 @@ func TestValidSubtree(t *testing.T) {
 		{"rounded width", 8, 13, true},
 		{"misaligned rounded width", 4, 9, false},
 		{"misaligned power of two", 5, 8, false},
-		{"empty", 8, 8, false},
+		{"empty", 8, 8, true},
 		{"reversed", 9, 8, false},
 		{"maximum end", maxUint48 - 1, maxUint48, true},
 		{"end outside uint48", maxUint48, maxUint48 + 1, false},

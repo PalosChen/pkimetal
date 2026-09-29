@@ -64,6 +64,8 @@ type Proof struct {
 // extension and subscriber signature syntax. Callers must treat its fields as
 // read-only.
 type Artifact struct {
+	Revision               string
+	RevisionError          error
 	InputKind              InputKind
 	Kind                   ArtifactKind
 	TypeConflict           bool

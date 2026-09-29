@@ -134,6 +134,8 @@ const (
 	MTC_SUBSCRIBER
 	CQRP_MTC_CA
 	CQRP_MTC_SUBSCRIBER
+	MTC_DRAFT06_CA
+	MTC_DRAFT06_SUBSCRIBER
 )
 
 var (
@@ -252,10 +254,12 @@ var (
 		BIMIGROUP_LEAF_VERIFIEDMARK:                {Name: "bimigroup_leaf_verifiedmark", Source: "Mark Certificate Guidelines", Description: "Verified Mark Certificate"},
 		BIMIGROUP_LEAF_VERIFIEDMARK_PRECERTIFICATE: {Name: "bimigroup_leaf_verifiedmark_precertificate", Source: "Mark Certificate Guidelines", Description: "Verified Mark Precertificate"},
 		// Merkle Tree Certificates.
-		MTC_CA:              {Name: "mtc_ca", Source: "draft-ietf-plants-merkle-tree-certs-05", Description: "MTC Certification Authority Certificate"},
-		MTC_SUBSCRIBER:      {Name: "mtc_subscriber", Source: "draft-ietf-plants-merkle-tree-certs-05", Description: "MTC Subscriber Certificate"},
-		CQRP_MTC_CA:         {Name: "cqrp_mtc_ca", Source: "CQRP v0.2.0", Description: "CQRP MTC CA Cosigning Certificate"},
-		CQRP_MTC_SUBSCRIBER: {Name: "cqrp_mtc_subscriber", Source: "CQRP v0.2.0", Description: "CQRP MTC Subscriber TLS Certificate"},
+		MTC_CA:                 {Name: "mtc_ca", Source: "draft-ietf-plants-merkle-tree-certs-05", Description: "MTC Certification Authority Certificate"},
+		MTC_SUBSCRIBER:         {Name: "mtc_subscriber", Source: "draft-ietf-plants-merkle-tree-certs-05", Description: "MTC Subscriber Certificate"},
+		CQRP_MTC_CA:            {Name: "cqrp_mtc_ca", Source: "CQRP v0.2.0", Description: "CQRP MTC CA Cosigning Certificate"},
+		CQRP_MTC_SUBSCRIBER:    {Name: "cqrp_mtc_subscriber", Source: "CQRP v0.2.0", Description: "CQRP MTC Subscriber TLS Certificate"},
+		MTC_DRAFT06_CA:         {Name: "mtc_draft06_ca", Source: "draft-ietf-plants-merkle-tree-certs-06", Description: "MTC draft-06 Certification Authority Certificate"},
+		MTC_DRAFT06_SUBSCRIBER: {Name: "mtc_draft06_subscriber", Source: "draft-ietf-plants-merkle-tree-certs-06", Description: "MTC draft-06 Subscriber Certificate"},
 	}
 
 	AllProfilesOrdered                                                               []Profile
@@ -329,7 +333,7 @@ func ProfileIDList(list []ProfileId) string {
 
 func IsMTCProfile(profile ProfileId) bool {
 	switch profile {
-	case MTC_CA, MTC_SUBSCRIBER, CQRP_MTC_CA, CQRP_MTC_SUBSCRIBER:
+	case MTC_CA, MTC_SUBSCRIBER, CQRP_MTC_CA, CQRP_MTC_SUBSCRIBER, MTC_DRAFT06_CA, MTC_DRAFT06_SUBSCRIBER:
 		return true
 	default:
 		return false

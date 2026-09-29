@@ -10,6 +10,9 @@ import (
 )
 
 func FuzzParseMTC(f *testing.F) {
+	f.Add(mtctest.Certificate(mtctest.ValidDraft06SubscriberTemplate()), uint8(mtc.InputCertificate))
+	f.Add(mtctest.Certificate(mtctest.ValidDraft06CATemplate()), uint8(mtc.InputCertificate))
+	f.Add(mtctest.TBSCertificate(mtctest.ValidDraft06SubscriberTemplate()), uint8(mtc.InputTBSCertificate))
 	f.Add(mtctest.Certificate(mtctest.ValidSubscriberTemplate()), uint8(mtc.InputCertificate))
 	f.Add(mtctest.TBSCertificate(mtctest.ValidSubscriberTemplate()), uint8(mtc.InputTBSCertificate))
 	f.Add([]byte{0x30, 0x80}, uint8(mtc.InputCertificate))
