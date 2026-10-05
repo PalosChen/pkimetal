@@ -158,6 +158,19 @@ TC: pure ML-DSA-44/65/87 with parameters absent, exact RFC 9881 §4 key sizes
 and byte-aligned BIT STRINGs, or BR 2.2.8 §§6.1.5–6.1.6/7.1.3.1 RSA/NIST EC
 keys with validated parameters and points. Ed25519 subscriber keys are rejected
 for both CSR and PoP; Ed25519 ACME account authentication remains supported.
-CA CSR admission also applies the existing TC Fermat/ROCA weak-key checks.
-Maintained Debian/compromised-key datasets and external qualification are not
-established by these structural checks; no full BR/CQRP certification is asserted.
+CA and TC enforce BR 2.2.8 §6.1.6's RSA exponent range, small-factor and
+prime-power SHOULD checks, plus Fermat/ROCA rejection (§6.1.1.3). Built-in
+Debian SHA-256 modulus/X-coordinate data is fixed to CAB Forum-recommended
+dwk_blocklists commit `38b221be821e79475bd07063b16d841a7bf4b3cc`, derived from
+CAB Forum commit `6409c3eedb8d03d61032266150c70571a0035005`. Checksummed
+resources cover RSA 2048/3072/4096/8192 and P-256/P-384/P-521; other RSA sizes
+up to 8192 are rejected while their screening data is unavailable. RSA above
+8192 follows the BR Debian exception; PoP retains its existing upper bound.
+Data failures remain service errors, never client-key errors or allow decisions.
+CA rejects new CSR/PoP keys found in retained keyCompromise (reason 1)
+records, including old/expired issuers, alternate RSA exponents and negated EC
+points. Accepted identical historical receipts remain immutable. This check
+uses bounded scalar pages without schema changes; it does not establish atomic
+serialization with concurrently uncommitted revocation reports. External
+compromised-key feeds, unrecorded reports, HSM/Chrome/operational qualification
+and full BR/CQRP certification remain outside this evidence.
