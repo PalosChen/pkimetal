@@ -153,8 +153,11 @@ ceremonies/key schedules (§2.6), and Chrome registry/operator obligations requi
 external qualification. §2.3.1 delegates to latest BR; the independently pinned
 BR 2.2.8 has not been silently upgraded or certified as satisfying that mandate.
 
-Additional certificate-local gaps remain in the legacy CA/TC PoC: subscriber
-key policy still permits Ed25519, and its RSA/EC checks do not establish all BR
-parameter constraints. The CQRP lint overlay rejects Ed25519; that does not
-prove every issuer path invokes it. These are implementation follow-ups, not
-external-only qualification, and no complete CQRP conformance is asserted.
+Subscriber-key admission now enforces CQRP v0.3.0 §2.4.3.2 in both CA and
+TC: pure ML-DSA-44/65/87 with parameters absent, exact RFC 9881 §4 key sizes
+and byte-aligned BIT STRINGs, or BR 2.2.8 §§6.1.5–6.1.6/7.1.3.1 RSA/NIST EC
+keys with validated parameters and points. Ed25519 subscriber keys are rejected
+for both CSR and PoP; Ed25519 ACME account authentication remains supported.
+CA CSR admission also applies the existing TC Fermat/ROCA weak-key checks.
+Maintained Debian/compromised-key datasets and external qualification are not
+established by these structural checks; no full BR/CQRP certification is asserted.
