@@ -14,13 +14,14 @@ proof OID is not a discriminator. Legacy Name/extension/vector16 and TAI-04
 properties remain available; new artifacts use .47.3 RELATIVE-OID, .47.4
 three-field SHA-256 CA parameters, outer vector24 and TAI-05 patterns/properties.
 
-The same CA ID, log origin/number, hash, key identity, indexes and checkpoint
-lineage continue. Historical entries, hashes, tiles, certificates and published
-checkpoints are not rewritten. Mixed-history support does not establish that
-an unmodified strict draft-06 monitor accepts legacy entries. `/draft-06` is a
-local dual-public-view convention, not a new log or registry allocation;
-legacy URLs/landmark objects remain independent. A valid fresh 05 view may
-advance even if a later 06 publication fails.
+The selected service rollout keeps the same CA ID and key while sealing N1
+and explicitly activating an independent N2 origin/tree. Historical entries,
+hashes, tiles, certificates, checkpoint lineage and URLs are not rewritten.
+Canonical public Log URLs use `/<CAID>/<N>`; the certified prefix ends before N.
+Former version-prefixed aliases preserve historical reads only. Local linting
+does not establish a current registry state, a live activation, or strict 06
+monitor acceptance of historical 05 entries. Protocol selection remains
+certificate-local and explicit; a URL never selects a lint profile.
 
 CA representations and CRL issuer/publication state are revision-separated for
 the same identity/key. Preserve old CA/CRL URLs and original artifact chains;
