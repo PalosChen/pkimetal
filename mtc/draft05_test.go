@@ -67,7 +67,7 @@ var draft05Expectations = map[string]findingExpectation{
 
 func TestRuleCoverageDocument(t *testing.T) {
 	draftCodes := assertRuleCodeList(t, "draft-05", Draft05RuleCodes)
-	cqrpCodes := assertRuleCodeList(t, "CQRP v0.2.0", CQRP020RuleCodes)
+	cqrpCodes := assertRuleCodeList(t, "CQRP v0.3.0", CQRP030RuleCodes)
 	mtcTlogCodes := assertRuleCodeList(t, "C2SP mtc-tlog", MTCTlogRuleCodes)
 
 	document, err := os.ReadFile("../doc/MTC_RULE_COVERAGE.md")
@@ -115,8 +115,8 @@ type coverageRecord struct {
 
 func expectedCoverageRecords(t *testing.T) map[string]coverageRecord {
 	t.Helper()
-	fields := expectationFields(t, draft05Expectations, cqrp020Expectations, mtcTlogExpectations)
-	records := make(map[string]coverageRecord, len(draft05Rules)+len(cqrp020Rules)+len(mtcTlogRuleCodes)+2)
+	fields := expectationFields(t, draft05Expectations, cqrp030Expectations, mtcTlogExpectations)
+	records := make(map[string]coverageRecord, len(draft05Rules)+len(cqrp030Rules)+len(mtcTlogRuleCodes)+2)
 	addRules := func(rules []Rule, cqrp bool) {
 		for _, rule := range rules {
 			if fields[rule.Code] == "" {
@@ -154,11 +154,11 @@ func expectedCoverageRecords(t *testing.T) map[string]coverageRecord {
 		}
 	}
 	addRules(draft05Rules, false)
-	addRules(cqrp020Rules, true)
+	addRules(cqrp030Rules, true)
 	addRules(commonMTCTlogRules(), false)
 	records["e_cqrp_ca_mtc_tlog_extension_missing"] = coverageRecord{
-		Source:             cqrp020Source,
-		Section:            "4.6.1",
+		Source:             cqrp030Source,
+		Section:            "2.4.3.1",
 		ArtifactProfile:    "CA / CQRP CA",
 		InputApplicability: "Certificate and TBS",
 		Fields:             fields["e_cqrp_ca_mtc_tlog_extension_missing"],

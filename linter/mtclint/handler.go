@@ -47,6 +47,10 @@ func (l *MTCLint) HandleRequest(_ context.Context, _ *linter.LinterInstance, req
 
 	var results []linter.LintingResult
 	draft06 := req.ProfileId == linter.MTC_DRAFT06_CA || req.ProfileId == linter.MTC_DRAFT06_SUBSCRIBER
+	cqrp := req.ProfileId == linter.CQRP_MTC_CA || req.ProfileId == linter.CQRP_MTC_SUBSCRIBER
+	if cqrp && req.MTCArtifact != nil && req.MTCArtifact.Revision == "06" {
+		draft06 = true
+	}
 	if req.MTCArtifact == nil || req.MTCArtifact.Kind != expected && !draft06 {
 		results = append(results, linter.LintingResult{
 			Finding:  fmt.Sprintf("[%s §%s] Selected profile %q expects %s artifact; actual artifact kind is %s", profileMismatchSource, profileMismatchSection, profileName, artifactKindName(expected), actualArtifactKindName(req.MTCArtifact)),
@@ -60,7 +64,7 @@ func (l *MTCLint) HandleRequest(_ context.Context, _ *linter.LinterInstance, req
 		results = append(results, mtcadapter.ConvertFindings(mtc.LintDraft06ForKind(req.MTCArtifact, expected))...)
 	} else {
 		if req.MTCArtifact != nil && (req.MTCArtifact.Revision == "06" || req.MTCArtifact.RevisionError != nil) {
-			results = append(results, linter.LintingResult{Code: "e_mtc_profile_revision_mismatch", Field: "profile", Finding: "[pkimetal profile dispatch] Selected legacy/CQRP profile requires draft-05 identity; CQRP v0.2.0 compatibility with draft-06 is not asserted", Severity: linter.SEVERITY_ERROR})
+			results = append(results, linter.LintingResult{Code: "e_mtc_profile_revision_mismatch", Field: "profile", Finding: "[pkimetal profile dispatch] Selected profile requires unambiguous draft-05 identity", Severity: linter.SEVERITY_ERROR})
 		}
 		results = append(results, mtcadapter.ConvertFindings(mtc.LintDraft05ForKind(req.MTCArtifact, expected))...)
 	}

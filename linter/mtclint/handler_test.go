@@ -57,7 +57,9 @@ func TestDraft06WrongRevisionProfiles(t *testing.T) {
 		t.Fatal(got)
 	}
 	assertHasCode(t, handle(t, linter.MTC_SUBSCRIBER, current), "e_mtc_profile_revision_mismatch")
-	assertHasCode(t, handle(t, linter.CQRP_MTC_SUBSCRIBER, current), "e_mtc_profile_revision_mismatch")
+	if got := handle(t, linter.CQRP_MTC_SUBSCRIBER, current); len(got) != 0 {
+		t.Fatalf("CQRP policy profile rejected typed draft-06 base: %#v", got)
+	}
 	assertHasCode(t, handle(t, linter.MTC_DRAFT06_CA, current), "e_mtc_profile_artifact_mismatch")
 }
 
@@ -73,6 +75,10 @@ func TestExportedRevisionFixturesUseTheirExplicitProfiles(t *testing.T) {
 		{"draft06-standalone.pem", linter.MTC_DRAFT06_SUBSCRIBER, mtc.InputCertificate},
 		{"draft06-landmark.pem", linter.MTC_DRAFT06_SUBSCRIBER, mtc.InputCertificate},
 		{"draft06-subscriber-tbs.pem", linter.MTC_DRAFT06_SUBSCRIBER, mtc.InputTBSCertificate},
+		{"draft06-ca.pem", linter.CQRP_MTC_CA, mtc.InputCertificate},
+		{"draft06-standalone.pem", linter.CQRP_MTC_SUBSCRIBER, mtc.InputCertificate},
+		{"draft06-landmark.pem", linter.CQRP_MTC_SUBSCRIBER, mtc.InputCertificate},
+		{"draft06-subscriber-tbs.pem", linter.CQRP_MTC_SUBSCRIBER, mtc.InputTBSCertificate},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
 			data, err := os.ReadFile(filepath.Join("..", "..", "mtc", "testdata", tc.file))

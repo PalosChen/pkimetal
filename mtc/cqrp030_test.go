@@ -12,38 +12,92 @@ import (
 	"github.com/pkimetal/pkimetal/internal/mtctest"
 )
 
-var cqrp020Expectations = map[string]findingExpectation{
-	"e_cqrp_ca_spki_algorithm":                   {"e_cqrp_ca_spki_algorithm", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.1"},
-	"e_cqrp_ca_spki_parameters_present":          {"e_cqrp_ca_spki_parameters_present", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm.parameters", "CQRP v0.2.0", "4.5.1"},
-	"e_cqrp_ca_spki_encoding":                    {"e_cqrp_ca_spki_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.1"},
-	"e_cqrp_ca_spki_key_encoding":                {"e_cqrp_ca_spki_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.subjectPublicKey", "CQRP v0.2.0", "4.5.1"},
-	"e_cqrp_ca_hash_mldsa":                       {"e_cqrp_ca_hash_mldsa", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.1"},
-	"e_cqrp_ca_key_usage_not_critical":           {"e_cqrp_ca_key_usage_not_critical", Error, "tbsCertificate.extensions.keyUsage", "CQRP v0.2.0", "4.5.1"},
-	"e_cqrp_ca_signature_algorithm":              {"e_cqrp_ca_signature_algorithm", Error, "tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "CQRP v0.2.0", "4.5.1"},
-	"e_cqrp_ca_signature_algorithm_encoding":     {"e_cqrp_ca_signature_algorithm_encoding", Error, "tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "CQRP v0.2.0", "4.5.1"},
-	"e_cqrp_ca_signature_parameters_present":     {"e_cqrp_ca_signature_parameters_present", Error, "tbsCertificate.extensions.mtcCertificationAuthority.sigAlg.parameters", "CQRP v0.2.0", "4.5.1"},
-	"e_cqrp_subscriber_validity_too_long":        {"e_cqrp_subscriber_validity_too_long", Error, "tbsCertificate.validity", "CQRP v0.2.0", "2.1"},
-	"e_cqrp_subscriber_mldsa_parameters_present": {"e_cqrp_subscriber_mldsa_parameters_present", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm.parameters", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_mldsa_encoding":           {"e_cqrp_subscriber_mldsa_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_mldsa_key_encoding":       {"e_cqrp_subscriber_mldsa_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.subjectPublicKey", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_hash_mldsa":               {"e_cqrp_subscriber_hash_mldsa", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_dv_subject_not_empty":     {"e_cqrp_subscriber_dv_subject_not_empty", Error, "tbsCertificate.subject", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_policies_missing":         {"e_cqrp_subscriber_policies_missing", Error, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_policies_critical":        {"e_cqrp_subscriber_policies_critical", Error, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_policy_identifier":        {"e_cqrp_subscriber_policy_identifier", Error, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.2.0", "4.5.2"},
-	"w_cqrp_subscriber_policy_not_dv":            {"w_cqrp_subscriber_policy_not_dv", Warning, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.2.0", "4.5.2"},
-	"w_cqrp_subscriber_policy_qualifiers":        {"w_cqrp_subscriber_policy_qualifiers", Warning, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_eku_missing":              {"e_cqrp_subscriber_eku_missing", Error, "tbsCertificate.extensions.extKeyUsage", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_eku_critical":             {"e_cqrp_subscriber_eku_critical", Error, "tbsCertificate.extensions.extKeyUsage", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_eku_only_server_auth":     {"e_cqrp_subscriber_eku_only_server_auth", Error, "tbsCertificate.extensions.extKeyUsage", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_ian_critical":             {"e_cqrp_subscriber_ian_critical", Error, "tbsCertificate.extensions.issuerAlternativeName", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_ian_form":                 {"e_cqrp_subscriber_ian_form", Error, "tbsCertificate.extensions.issuerAlternativeName", "CQRP v0.2.0", "4.5.2"},
-	"w_cqrp_subscriber_ian_name_attributes":      {"w_cqrp_subscriber_ian_name_attributes", Warning, "tbsCertificate.extensions.issuerAlternativeName", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_sct_present":              {"e_cqrp_subscriber_sct_present", Error, "tbsCertificate.extensions.signedCertificateTimestampList", "CQRP v0.2.0", "4.5.2"},
-	"e_cqrp_subscriber_standalone_cosignatures":  {"e_cqrp_subscriber_standalone_cosignatures", Error, "signatureValue.signatures", "CQRP v0.2.0", "4.7"},
+var cqrp030Expectations = map[string]findingExpectation{
+	"e_cqrp_ca_spki_algorithm":                   {"e_cqrp_ca_spki_algorithm", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.3.0", "2.4.3.1"},
+	"e_cqrp_ca_spki_parameters_present":          {"e_cqrp_ca_spki_parameters_present", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm.parameters", "CQRP v0.3.0", "2.4.3.1"},
+	"e_cqrp_ca_spki_encoding":                    {"e_cqrp_ca_spki_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.3.0", "2.4.3.1"},
+	"e_cqrp_ca_spki_key_encoding":                {"e_cqrp_ca_spki_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.subjectPublicKey", "CQRP v0.3.0", "2.4.3.1"},
+	"e_cqrp_ca_hash_mldsa":                       {"e_cqrp_ca_hash_mldsa", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.3.0", "2.4.3.1"},
+	"e_cqrp_ca_key_usage_not_critical":           {"e_cqrp_ca_key_usage_not_critical", Error, "tbsCertificate.extensions.keyUsage", "CQRP v0.3.0", "2.4.3.1"},
+	"e_cqrp_ca_signature_algorithm":              {"e_cqrp_ca_signature_algorithm", Error, "tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "CQRP v0.3.0", "2.4.3.1"},
+	"e_cqrp_ca_signature_algorithm_encoding":     {"e_cqrp_ca_signature_algorithm_encoding", Error, "tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "CQRP v0.3.0", "2.4.3.1"},
+	"e_cqrp_ca_signature_parameters_present":     {"e_cqrp_ca_signature_parameters_present", Error, "tbsCertificate.extensions.mtcCertificationAuthority.sigAlg.parameters", "CQRP v0.3.0", "2.4.3.1"},
+	"e_cqrp_subscriber_validity_too_long":        {"e_cqrp_subscriber_validity_too_long", Error, "tbsCertificate.validity", "CQRP v0.3.0", "2.6.2"},
+	"e_cqrp_subscriber_log_number_not_trusted":   {"e_cqrp_subscriber_log_number_not_trusted", Error, "tbsCertificate.serialNumber", "CQRP v0.3.0", "2.5.1.3"},
+	"e_cqrp_subscriber_mldsa_parameters_present": {"e_cqrp_subscriber_mldsa_parameters_present", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm.parameters", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_mldsa_encoding":           {"e_cqrp_subscriber_mldsa_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_mldsa_key_encoding":       {"e_cqrp_subscriber_mldsa_encoding", Error, "tbsCertificate.subjectPublicKeyInfo.subjectPublicKey", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_hash_mldsa":               {"e_cqrp_subscriber_hash_mldsa", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_dv_subject_not_empty":     {"e_cqrp_subscriber_dv_subject_not_empty", Error, "tbsCertificate.subject", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_policies_missing":         {"e_cqrp_subscriber_policies_missing", Error, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_policies_critical":        {"e_cqrp_subscriber_policies_critical", Error, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_policy_identifier":        {"e_cqrp_subscriber_policy_identifier", Error, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.3.0", "2.4.3.2"},
+	"w_cqrp_subscriber_policy_not_dv":            {"w_cqrp_subscriber_policy_not_dv", Warning, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.3.0", "2.4.3.2"},
+	"w_cqrp_subscriber_policy_qualifiers":        {"w_cqrp_subscriber_policy_qualifiers", Warning, "tbsCertificate.extensions.certificatePolicies", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_eku_missing":              {"e_cqrp_subscriber_eku_missing", Error, "tbsCertificate.extensions.extKeyUsage", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_eku_critical":             {"e_cqrp_subscriber_eku_critical", Error, "tbsCertificate.extensions.extKeyUsage", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_eku_only_server_auth":     {"e_cqrp_subscriber_eku_only_server_auth", Error, "tbsCertificate.extensions.extKeyUsage", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_ian_critical":             {"e_cqrp_subscriber_ian_critical", Error, "tbsCertificate.extensions.issuerAlternativeName", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_ian_form":                 {"e_cqrp_subscriber_ian_form", Error, "tbsCertificate.extensions.issuerAlternativeName", "CQRP v0.3.0", "2.4.3.2"},
+	"w_cqrp_subscriber_ian_name_attributes":      {"w_cqrp_subscriber_ian_name_attributes", Warning, "tbsCertificate.extensions.issuerAlternativeName", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_sct_present":              {"e_cqrp_subscriber_sct_present", Error, "tbsCertificate.extensions.signedCertificateTimestampList", "CQRP v0.3.0", "2.4.3.2"},
+	"e_cqrp_subscriber_standalone_cosignatures":  {"e_cqrp_subscriber_standalone_cosignatures", Error, "signatureValue.signatures", "CQRP v0.3.0", "2.4.5"},
 }
 
-func TestCQRP020ValidArtifactsHaveNoFindings(t *testing.T) {
+func TestCQRP030SubscriberLogLimit(t *testing.T) {
+	for _, revision := range []string{"05", "06"} {
+		for _, kind := range []InputKind{InputCertificate, InputTBSCertificate} {
+			for _, logNumber := range []uint64{2, 4, 5} {
+				tpl := mtctest.ValidCQRPSubscriberTemplate()
+				tpl.Serial.SetUint64(logNumber<<48 | 7)
+				if revision == "06" {
+					tpl.Issuer = mtctest.ValidDraft06SubscriberTemplate().Issuer
+					tpl.Signature = mtctest.ProofBytesForRevision(mtctest.ValidProof(), "06")
+				}
+				input := mtctest.Certificate(tpl)
+				if kind == InputTBSCertificate {
+					input = mtctest.TBSCertificate(tpl)
+				}
+				findings := LintCQRP030(parseArtifact(t, input, kind))
+				var logFindings []Finding
+				for _, finding := range findings {
+					if finding.Code == "e_cqrp_subscriber_log_number_not_trusted" {
+						logFindings = append(logFindings, finding)
+					}
+				}
+				if logNumber <= 4 {
+					if len(logFindings) != 0 {
+						t.Errorf("revision %s kind %v N%d rejected: %#v", revision, kind, logNumber, logFindings)
+					}
+				} else if len(logFindings) != 1 || logFindings[0].Source != "CQRP v0.3.0" || logFindings[0].Section != "2.5.1.3" || logFindings[0].Severity != Error {
+					t.Errorf("revision %s kind %v N%d findings = %#v", revision, kind, logNumber, findings)
+				}
+			}
+		}
+	}
+}
+
+func TestCQRP030Draft06ProofIsCheckedWithoutChangingArtifact(t *testing.T) {
+	tpl := mtctest.ValidCQRPSubscriberTemplate()
+	tpl.Issuer = mtctest.ValidDraft06SubscriberTemplate().Issuer
+	proof := mtctest.ValidProof()
+	proof.Signatures = []mtctest.ProofSignature{{CosignerID: []byte{1}, Signature: []byte{1}}}
+	tpl.Signature = mtctest.ProofBytesForRevision(proof, "06")
+	artifact := parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)
+	originalProof := artifact.Proof
+	findings := LintCQRP030ForKind(artifact, ArtifactSubscriber)
+	if len(findings) != 1 || findings[0].Code != "e_cqrp_subscriber_standalone_cosignatures" || findings[0].Source != "CQRP v0.3.0" || findings[0].Section != "2.4.5" {
+		t.Fatalf("single-signature06 standalone findings = %#v", findings)
+	}
+	if artifact.Proof != originalProof || artifact.ProofParseError != nil {
+		t.Fatal("explicit policy evaluation changed original proof state")
+	}
+	if got := LintCQRP030ForKind(parseArtifact(t, mtctest.TBSCertificate(tpl), InputTBSCertificate), ArtifactSubscriber); len(got) != 0 {
+		t.Fatalf("TBS input was evaluated as a complete proof: %#v", got)
+	}
+}
+
+func TestCQRP030ValidArtifactsHaveNoFindings(t *testing.T) {
 	tests := []struct {
 		name string
 		tpl  mtctest.Template
@@ -63,7 +117,7 @@ func TestCQRP020ValidArtifactsHaveNoFindings(t *testing.T) {
 				input = mtctest.TBSCertificate(tc.tpl)
 			}
 			artifact := parseArtifact(t, input, tc.kind)
-			assertCQRPFindings(t, LintCQRP020(artifact))
+			assertCQRPFindings(t, LintCQRP030(artifact))
 			if got := len(artifact.SubjectPublicKey.SubjectPublicKey); got != 1312 {
 				t.Fatalf("baseline ML-DSA-44 public key length = %d, want 1312", got)
 			}
@@ -71,7 +125,7 @@ func TestCQRP020ValidArtifactsHaveNoFindings(t *testing.T) {
 	}
 }
 
-func TestCQRP020CARules(t *testing.T) {
+func TestCQRP030CARules(t *testing.T) {
 	tests := []struct {
 		name   string
 		mutate func(*mtctest.Template)
@@ -133,12 +187,12 @@ func TestCQRP020CARules(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tpl := mtctest.ValidCQRPCATemplate()
 			tc.mutate(&tpl)
-			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
+			assertCQRPFindings(t, LintCQRP030(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
 		})
 	}
 }
 
-func TestCQRP020CAExtensionSignatureAlgorithm(t *testing.T) {
+func TestCQRP030CAExtensionSignatureAlgorithm(t *testing.T) {
 	tests := []struct {
 		name string
 		sig  mtctest.Algorithm
@@ -154,22 +208,22 @@ func TestCQRP020CAExtensionSignatureAlgorithm(t *testing.T) {
 			mtctest.ReplaceExtension(&tpl, mtctest.Extension{ID: mtctest.OIDMTC_CA, Critical: true, Value: mtctest.CAExtensionDER(
 				mtctest.Algorithm{OID: mtctest.OIDSHA256}, tc.sig, big.NewInt(100), big.NewInt(999),
 			)})
-			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
+			assertCQRPFindings(t, LintCQRP030(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
 		})
 	}
 }
 
-func TestCQRP020DuplicateCAKeyUsageMessage(t *testing.T) {
+func TestCQRP030DuplicateCAKeyUsageMessage(t *testing.T) {
 	tpl := mtctest.ValidCQRPCATemplate()
 	tpl.Extensions = append(tpl.Extensions, mtctest.Extension{ID: mtctest.OIDKeyUsage, Critical: true, Value: mtctest.KeyUsageDER(true)})
-	findings := LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate))
+	findings := LintCQRP030(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate))
 	assertCQRPFindings(t, findings, "e_cqrp_ca_key_usage_not_critical")
 	if got, want := findings[0].Message, "CA key usage extension is duplicated, which violates the certificate profile and RFC 5280"; got != want {
 		t.Fatalf("duplicate keyUsage message = %q, want %q", got, want)
 	}
 }
 
-func TestCQRP020SubscriberSPKIAndValidity(t *testing.T) {
+func TestCQRP030SubscriberSPKIAndValidity(t *testing.T) {
 	tests := []struct {
 		name   string
 		mutate func(*mtctest.Template)
@@ -223,12 +277,12 @@ func TestCQRP020SubscriberSPKIAndValidity(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tpl := mtctest.ValidCQRPSubscriberTemplate()
 			tc.mutate(&tpl)
-			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
+			assertCQRPFindings(t, LintCQRP030(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
 		})
 	}
 }
 
-func TestCQRP020SubscriberPolicies(t *testing.T) {
+func TestCQRP030SubscriberPolicies(t *testing.T) {
 	tests := []struct {
 		name   string
 		mutate func(*mtctest.Template)
@@ -332,12 +386,12 @@ func TestCQRP020SubscriberPolicies(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tpl := mtctest.ValidCQRPSubscriberTemplate()
 			tc.mutate(&tpl)
-			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
+			assertCQRPFindings(t, LintCQRP030(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
 		})
 	}
 }
 
-func TestCQRP020SubscriberEKU(t *testing.T) {
+func TestCQRP030SubscriberEKU(t *testing.T) {
 	tests := []struct {
 		name   string
 		mutate func(*mtctest.Template)
@@ -378,12 +432,12 @@ func TestCQRP020SubscriberEKU(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tpl := mtctest.ValidCQRPSubscriberTemplate()
 			tc.mutate(&tpl)
-			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
+			assertCQRPFindings(t, LintCQRP030(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
 		})
 	}
 }
 
-func TestCQRP020SubscriberIANAndSCT(t *testing.T) {
+func TestCQRP030SubscriberIANAndSCT(t *testing.T) {
 	validName := mtctest.NameDER(
 		mtctest.NameAttribute{ID: mtctest.OIDOrganizationName, Value: "Example"},
 		mtctest.NameAttribute{ID: mtctest.OIDCommonName, Value: "Example Issuer"},
@@ -450,7 +504,7 @@ func TestCQRP020SubscriberIANAndSCT(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tpl := mtctest.ValidCQRPSubscriberTemplate()
 			tc.mutate(&tpl)
-			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
+			assertCQRPFindings(t, LintCQRP030(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)), tc.want...)
 		})
 	}
 }
@@ -464,7 +518,7 @@ func addIANName(name []byte) func(*mtctest.Template) {
 	}
 }
 
-func TestCQRP020StandaloneCosignatures(t *testing.T) {
+func TestCQRP030StandaloneCosignatures(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		signatures []mtctest.ProofSignature
@@ -487,60 +541,60 @@ func TestCQRP020StandaloneCosignatures(t *testing.T) {
 			} else {
 				input = mtctest.TBSCertificate(tpl)
 			}
-			assertCQRPFindings(t, LintCQRP020(parseArtifact(t, input, tc.kind)), tc.want...)
+			assertCQRPFindings(t, LintCQRP030(parseArtifact(t, input, tc.kind)), tc.want...)
 		})
 	}
 }
 
-func TestCQRP020ApplicabilityAndIndependence(t *testing.T) {
+func TestCQRP030ApplicabilityAndIndependence(t *testing.T) {
 	ca := parseArtifact(t, mtctest.Certificate(mtctest.ValidCQRPCATemplate()), InputCertificate)
 	ca.Kind = ArtifactSubscriber
-	assertCQRPFindings(t, LintCQRP020ForKind(ca, ArtifactCA))
+	assertCQRPFindings(t, LintCQRP030ForKind(ca, ArtifactCA))
 	if ca.Kind != ArtifactSubscriber {
-		t.Fatal("LintCQRP020ForKind mutated caller kind")
+		t.Fatal("LintCQRP030ForKind mutated caller kind")
 	}
 
 	subscriber := parseArtifact(t, mtctest.Certificate(mtctest.ValidCQRPSubscriberTemplate()), InputCertificate)
 	originalProof := subscriber.Proof
 	originalProofErr := subscriber.ProofParseError
 	originalSignature := bytes.Clone(subscriber.SignatureValue)
-	assertCQRPFindings(t, LintCQRP020ForKind(subscriber, ArtifactSubscriber))
+	assertCQRPFindings(t, LintCQRP030ForKind(subscriber, ArtifactSubscriber))
 	if subscriber.Proof != originalProof || subscriber.ProofParseError != originalProofErr || !bytes.Equal(subscriber.SignatureValue, originalSignature) {
-		t.Fatal("LintCQRP020ForKind mutated caller proof state")
+		t.Fatal("LintCQRP030ForKind mutated caller proof state")
 	}
-	if got := LintCQRP020ForKind(subscriber, ArtifactUnknown); got != nil {
+	if got := LintCQRP030ForKind(subscriber, ArtifactUnknown); got != nil {
 		t.Fatalf("unsupported kind = %#v", got)
 	}
-	if got := LintCQRP020ForKind(nil, ArtifactSubscriber); got != nil {
+	if got := LintCQRP030ForKind(nil, ArtifactSubscriber); got != nil {
 		t.Fatalf("nil artifact = %#v", got)
 	}
 
 	tpl := mtctest.ValidCQRPSubscriberTemplate()
 	tpl.TBSSignature = mtctest.Algorithm{OID: asn1.ObjectIdentifier{1, 2, 3}}
 	tpl.OuterSignature = tpl.TBSSignature
-	assertCQRPFindings(t, LintCQRP020ForKind(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate), ArtifactSubscriber))
+	assertCQRPFindings(t, LintCQRP030ForKind(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate), ArtifactSubscriber))
 }
 
-func TestCQRP020CARequiresMTCTlog(t *testing.T) {
+func TestCQRP030CARequiresMTCTlog(t *testing.T) {
 	tpl := mtctest.ValidCQRPCATemplate()
 	mtctest.RemoveExtension(&tpl, mtctest.OIDMTCTlogPrefixURL)
 	artifact := parseArtifact(t, mtctest.Certificate(tpl), InputCertificate)
-	for _, finding := range LintCQRP020(artifact) {
+	for _, finding := range LintCQRP030(artifact) {
 		if finding.Code == "e_cqrp_ca_mtc_tlog_extension_missing" {
 			return
 		}
 	}
-	t.Fatal("LintCQRP020 did not require the mtc-tlog extension for a CA")
+	t.Fatal("LintCQRP030 did not require the mtc-tlog extension for a CA")
 }
 
-func TestCQRP020RegistersExactlyRequiredRules(t *testing.T) {
-	wantCodes := make(map[string]bool, len(cqrp020Expectations))
-	for _, expectation := range cqrp020Expectations {
+func TestCQRP030RegistersExactlyRequiredRules(t *testing.T) {
+	wantCodes := make(map[string]bool, len(cqrp030Expectations))
+	for _, expectation := range cqrp030Expectations {
 		wantCodes[expectation.Code] = true
 	}
 	seen := make(map[string]bool, len(wantCodes))
-	for _, rule := range cqrp020Rules {
-		expectation, ok := cqrp020Expectations[rule.Code]
+	for _, rule := range cqrp030Rules {
+		expectation, ok := cqrp030Expectations[rule.Code]
 		if !ok {
 			t.Errorf("unexpected CQRP rule %q", rule.Code)
 			continue
@@ -562,7 +616,7 @@ func TestCQRP020RegistersExactlyRequiredRules(t *testing.T) {
 		}
 	}
 	all := make(map[string]bool)
-	for _, rules := range [][]Rule{draft05Rules, cqrp020Rules} {
+	for _, rules := range [][]Rule{draft05Rules, cqrp030Rules} {
 		for _, rule := range rules {
 			if all[rule.Code] {
 				t.Errorf("duplicate registry code %q", rule.Code)
@@ -577,7 +631,7 @@ func assertCQRPFindings(t *testing.T, findings []Finding, ids ...string) {
 	want := make([]findingExpectation, len(ids))
 	for i, id := range ids {
 		var ok bool
-		want[i], ok = cqrp020Expectations[id]
+		want[i], ok = cqrp030Expectations[id]
 		if !ok {
 			want[i], ok = mtcTlogExpectations[id]
 		}

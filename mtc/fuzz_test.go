@@ -35,7 +35,7 @@ func FuzzParseMTC(f *testing.F) {
 		if !reflect.DeepEqual(mtc.LintDraft05(first), mtc.LintDraft05(second)) {
 			t.Fatal("draft-05 findings changed after copying input")
 		}
-		if !reflect.DeepEqual(mtc.LintCQRP020(first), mtc.LintCQRP020(second)) {
+		if !reflect.DeepEqual(mtc.LintCQRP030(first), mtc.LintCQRP030(second)) {
 			t.Fatal("CQRP findings changed after copying input")
 		}
 	})

@@ -4,12 +4,14 @@ This fork implements explicit draft-06 and retained draft-05 experimental MTC li
 Profiles 105-108 retain their names and meanings; 109 is `mtc_draft06_ca` and
 110 is `mtc_draft06_subscriber`. Complete certificates and TBS artifacts are
 supported; proof/outer-certificate rules do not apply to TBS inputs. The legacy
-matrix below remains the retained draft-05/CQRP baseline, not a draft-06 claim.
+MTC matrix below describes retained draft-05 findings; the CQRP v0.3.0 overlay
+applies to both unambiguous draft-05 and draft-06 artifacts.
 
 The retained profile implements Merkle Tree Certificate (MTC) linting against
 [draft-ietf-plants-merkle-tree-certs-05](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05),
 the unsigned-certificate requirements in [RFC 9925](https://www.rfc-editor.org/rfc/rfc9925.html),
-and a user-supplied local CQRP v0.2.0 draft baseline. The CQRP baseline is not a
+and official CQRP v0.3.0 (2026-08-14), pinned with original-source SHA-256 in
+[SPECIFICATIONS.md](../SPECIFICATIONS.md). The CQRP baseline is not a
 reference to a later or generic MTC Internet-Draft.
 
 ## Profiles and precedence
@@ -48,11 +50,11 @@ Additional draft-06 findings:
 The generic subtree helper accepts empty `[x,x)` intervals in the uint48
 domain (section 4.1); a certificate proof still must contain a nonempty
 subtree with its index (sections 4.3.2 and 6.2).
-The pinned C2SP profile and CQRP v0.2.0 are not upgraded. C2SP's old explicit
+The C2SP profile stays pinned; CQRP is explicitly updated to v0.3.0. C2SP's old explicit
 `logHash` structure is superseded only by the project's selected MTC-06
 encoding: its SHA-256 requirement is checked against the `.47.4` OID-derived
-hash. CQRP profiles remain legacy-only and report revision mismatch for
-draft-06 instead of asserting unverified CQRP compatibility.
+hash. CQRP profiles compose this policy with the artifact's unambiguous native
+MTC revision; conflicting identity evidence still produces a revision error.
 
 Compatible zlint checks retain the existing MTC non-CABF filtering and skip
 when zcrypto cannot parse the certificate. No external log-state, trusted-root,
@@ -62,9 +64,9 @@ is inferred by these structural lints.
 ### Legacy and CQRP profiles
 
 The explicit profiles are `mtc_ca`, `mtc_subscriber`, `cqrp_mtc_ca`, and
-`cqrp_mtc_subscriber`. The two CQRP profiles run both `mtclint` for the draft-05
-base profile and `cqrplint` for the CQRP overlay. CQRP overrides the TLS Baseline
-Requirements only where CQRP v0.2.0 says so explicitly. Likewise, draft-05
+`cqrp_mtc_subscriber`. The two CQRP profiles run both `mtclint` for the selected
+draft-05/draft-06 artifact and `cqrplint` for the CQRP v0.3.0 overlay. CQRP overrides the TLS Baseline
+Requirements only where CQRP v0.3.0 says so explicitly. Likewise, draft-05
 overrides RFC 5280 only where draft-05 says so explicitly; compatible RFC 5280
 and TLS checks remain delegated to other registered linters.
 
@@ -103,13 +105,27 @@ cover matching algorithm identifiers, absent parameters, an empty outer
 signature, absent issuerUniqueID, and warnings for authorityKeyIdentifier or
 issuerAltName.
 
+CQRP §2.5.1.3 rejects subscriber log numbers above 4 in Certificate and TBS
+inputs. §2.4.5 proof checks use vector16 for draft-05 and vector24 for draft-06;
+TBS inputs do not have a proof. Signature count is structural evidence only:
+trusted CA/Mirror identities, Usable/pre-freeze Frozen registry state and
+operator independence still need external verification.
+
+Full Chrome policy compliance also requires BOTH standalone and
+landmark-relative forms (§2.4), effective published machine-readable profiles
+(§2.3.2), DCV/ARI operational evidence (§§2.4.1–2.4.2), approved same-key log
+replacement and incident disclosure (§2.5.1.2), retention/availability history,
+key roles/HSM/ceremonies and registry obligations. See SPECIFICATIONS.md.
+Deprecated exported CQRP020 function names are compatibility aliases to the
+current v0.3.0 checks; they do not preserve a v0.2.0 acceptance baseline.
+
 ## Stable finding codes
 
 Every implemented stable finding code appears exactly once below. "Artifact / profile"
 describes the profile context in which the rule is registered, not a claim that
 every input will trigger the finding. The Source column records exact finding
-wire metadata; CQRP rows therefore use `CQRP v0.2.0`, while the implementation
-baseline remains the user-supplied local draft described above.
+wire metadata; CQRP rows use `CQRP v0.3.0`, the official pinned policy described
+above. Existing profile IDs and finding codes are retained.
 
 ### Draft-05 and conditional RFC 9925
 
@@ -159,11 +175,11 @@ baseline remains the user-supplied local draft described above.
 The C2SP rules are pinned to repository commit
 `3bc97b2329fee167f7ff39efbbbc316c84876105`. Generic MTC CAs opt in by
 including the prefix URL extension; CQRP CAs require the extension through
-CQRP section 4.6.1.
+CQRP section 2.4.3.1.
 
 | Code | Source | Section | Artifact / profile | Input applicability | Field(s) | Severity | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `e_cqrp_ca_mtc_tlog_extension_missing` | CQRP v0.2.0 | 4.6.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
+| `e_cqrp_ca_mtc_tlog_extension_missing` | CQRP v0.3.0 | 2.4.3.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
 | `e_mtc_tlog_ca_cosigner_not_mldsa44` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Cosigners | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm,tbsCertificate.extensions.mtcCertificationAuthority.sigAlg | error | implemented |
 | `e_mtc_tlog_extension_critical` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
 | `e_mtc_tlog_extension_duplicate` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
@@ -171,36 +187,37 @@ CQRP section 4.6.1.
 | `e_mtc_tlog_log_hash_not_sha256` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.logHash | error | implemented |
 | `e_mtc_tlog_prefix_url_invalid` | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Parameters | CA / MTC and CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcTlogPrefixURL | error | implemented |
 
-### CQRP v0.2.0 overlay
+### CQRP v0.3.0 overlay
 
 | Code | Source | Section | Artifact / profile | Input applicability | Field(s) | Severity | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `e_cqrp_ca_hash_mldsa` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm | error | implemented |
-| `e_cqrp_ca_key_usage_not_critical` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.keyUsage | error | implemented |
-| `e_cqrp_ca_signature_algorithm` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.sigAlg | error | implemented |
-| `e_cqrp_ca_signature_algorithm_encoding` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.sigAlg | error | implemented |
-| `e_cqrp_ca_signature_parameters_present` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.sigAlg.parameters | error | implemented |
-| `e_cqrp_ca_spki_algorithm` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm | error | implemented |
-| `e_cqrp_ca_spki_encoding` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm; tbsCertificate.subjectPublicKeyInfo.subjectPublicKey | error | implemented |
-| `e_cqrp_ca_spki_parameters_present` | CQRP v0.2.0 | 4.5.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm.parameters | error | implemented |
-| `e_cqrp_subscriber_dv_subject_not_empty` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subject | error | implemented |
-| `e_cqrp_subscriber_eku_critical` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.extKeyUsage | error | implemented |
-| `e_cqrp_subscriber_eku_missing` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.extKeyUsage | error | implemented |
-| `e_cqrp_subscriber_eku_only_server_auth` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.extKeyUsage | error | implemented |
-| `e_cqrp_subscriber_hash_mldsa` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm | error | implemented |
-| `e_cqrp_subscriber_ian_critical` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | error | implemented |
-| `e_cqrp_subscriber_ian_form` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | error | implemented |
-| `e_cqrp_subscriber_mldsa_encoding` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm; tbsCertificate.subjectPublicKeyInfo.subjectPublicKey | error | implemented |
-| `e_cqrp_subscriber_mldsa_parameters_present` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm.parameters | error | implemented |
-| `e_cqrp_subscriber_policies_critical` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | error | implemented |
-| `e_cqrp_subscriber_policies_missing` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | error | implemented |
-| `e_cqrp_subscriber_policy_identifier` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | error | implemented |
-| `e_cqrp_subscriber_sct_present` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.signedCertificateTimestampList | error | implemented |
-| `e_cqrp_subscriber_standalone_cosignatures` | CQRP v0.2.0 | 4.7 | Subscriber / CQRP subscriber | Certificate only | signatureValue.signatures | error | implemented |
-| `e_cqrp_subscriber_validity_too_long` | CQRP v0.2.0 | 2.1 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.validity | error | implemented |
-| `w_cqrp_subscriber_ian_name_attributes` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | warning | implemented |
-| `w_cqrp_subscriber_policy_not_dv` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | warning | implemented |
-| `w_cqrp_subscriber_policy_qualifiers` | CQRP v0.2.0 | 4.5.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | warning | implemented |
+| `e_cqrp_ca_hash_mldsa` | CQRP v0.3.0 | 2.4.3.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm | error | implemented |
+| `e_cqrp_ca_key_usage_not_critical` | CQRP v0.3.0 | 2.4.3.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.keyUsage | error | implemented |
+| `e_cqrp_ca_signature_algorithm` | CQRP v0.3.0 | 2.4.3.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.sigAlg | error | implemented |
+| `e_cqrp_ca_signature_algorithm_encoding` | CQRP v0.3.0 | 2.4.3.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.sigAlg | error | implemented |
+| `e_cqrp_ca_signature_parameters_present` | CQRP v0.3.0 | 2.4.3.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.extensions.mtcCertificationAuthority.sigAlg.parameters | error | implemented |
+| `e_cqrp_ca_spki_algorithm` | CQRP v0.3.0 | 2.4.3.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm | error | implemented |
+| `e_cqrp_ca_spki_encoding` | CQRP v0.3.0 | 2.4.3.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm; tbsCertificate.subjectPublicKeyInfo.subjectPublicKey | error | implemented |
+| `e_cqrp_ca_spki_parameters_present` | CQRP v0.3.0 | 2.4.3.1 | CA / CQRP CA | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm.parameters | error | implemented |
+| `e_cqrp_subscriber_dv_subject_not_empty` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subject | error | implemented |
+| `e_cqrp_subscriber_eku_critical` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.extKeyUsage | error | implemented |
+| `e_cqrp_subscriber_eku_missing` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.extKeyUsage | error | implemented |
+| `e_cqrp_subscriber_eku_only_server_auth` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.extKeyUsage | error | implemented |
+| `e_cqrp_subscriber_hash_mldsa` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm | error | implemented |
+| `e_cqrp_subscriber_ian_critical` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | error | implemented |
+| `e_cqrp_subscriber_ian_form` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | error | implemented |
+| `e_cqrp_subscriber_mldsa_encoding` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm; tbsCertificate.subjectPublicKeyInfo.subjectPublicKey | error | implemented |
+| `e_cqrp_subscriber_mldsa_parameters_present` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.subjectPublicKeyInfo.algorithm.parameters | error | implemented |
+| `e_cqrp_subscriber_policies_critical` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | error | implemented |
+| `e_cqrp_subscriber_policies_missing` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | error | implemented |
+| `e_cqrp_subscriber_policy_identifier` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | error | implemented |
+| `e_cqrp_subscriber_sct_present` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.signedCertificateTimestampList | error | implemented |
+| `e_cqrp_subscriber_standalone_cosignatures` | CQRP v0.3.0 | 2.4.5 | Subscriber / CQRP subscriber | Certificate only | signatureValue.signatures | error | implemented |
+| `e_cqrp_subscriber_validity_too_long` | CQRP v0.3.0 | 2.6.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.validity | error | implemented |
+| `e_cqrp_subscriber_log_number_not_trusted` | CQRP v0.3.0 | 2.5.1.3 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.serialNumber | error | implemented |
+| `w_cqrp_subscriber_ian_name_attributes` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.issuerAlternativeName | warning | implemented |
+| `w_cqrp_subscriber_policy_not_dv` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | warning | implemented |
+| `w_cqrp_subscriber_policy_qualifiers` | CQRP v0.3.0 | 2.4.3.2 | Subscriber / CQRP subscriber | Certificate and TBS | tbsCertificate.extensions.certificatePolicies | warning | implemented |
 
 ### Dispatcher and rule-runner findings
 
@@ -225,7 +242,7 @@ codes.
 | Trust Anchor ID PEN ownership | draft-ietf-tls-trust-anchor-ids-04 | 3 | Subscriber / MTC and CQRP subscriber | Requires an authoritative PEN registry and ownership context | n/a | none | not locally decidable |
 | Non-CA cosigner ML-DSA-44 key | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Cosigners | Subscriber / MTC and CQRP subscriber | Certificate carries only a Trust Anchor ID; resolving the cosigner key requires external trust-anchor data | n/a | none | not locally decidable |
 | mtc-tlog endpoints and checkpoint state | C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105 | Client behavior and log operation | CA / MTC and CQRP CA | Requires network access and external log state | n/a | none | not locally decidable |
-| External log-entry comparison and signer/operator role independence | draft-ietf-plants-merkle-tree-certs-05 and CQRP v0.2.0 local draft | Operational requirements | All MTC profiles | Requires external records and roles | n/a | none | not locally decidable |
-| Chrome cosigner independence | CQRP v0.2.0 local draft | Registry-dependent requirements | CQRP profiles | Requires Chrome registry and operator identity data | n/a | none | not locally decidable |
-| Chrome registry policy | CQRP v0.2.0 local draft | Registry-dependent requirements | CQRP profiles | Requires an online registry query | n/a | none | not locally decidable |
-| Conditional CA cRLSign behavior | CQRP v0.2.0 local draft | 4.5.1 | CA / CQRP CA | Requires external CA role and CRL behavior | n/a | none | not locally decidable |
+| External log-entry comparison and signer/operator role independence | draft-ietf-plants-merkle-tree-certs-05 and CQRP v0.3.0 | Operational requirements | All MTC profiles | Requires external records and roles | n/a | none | not locally decidable |
+| Chrome cosigner independence | CQRP v0.3.0 | Registry-dependent requirements | CQRP profiles | Requires Chrome registry and operator identity data | n/a | none | not locally decidable |
+| Chrome registry policy | CQRP v0.3.0 | Registry-dependent requirements | CQRP profiles | Requires an online registry query | n/a | none | not locally decidable |
+| Conditional CA cRLSign behavior | CQRP v0.3.0 | 2.4.3.1 | CA / CQRP CA | Requires external CA role and CRL behavior | n/a | none | not locally decidable |

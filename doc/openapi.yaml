@@ -3,9 +3,10 @@ info:
   title: pkimetal Experimental MTC Fork API
   description: >-
     API definition for a separately deployed experimental pkimetal fork with
-    MTC draft-06 (TAI-05), retained draft-05 (TAI-04), and independent CQRP v0.2.0 linting.
+    MTC draft-06 (TAI-05), retained draft-05 (TAI-04), and official CQRP v0.3.0 linting.
     Profiles 105-108 remain legacy/CQRP; 109-110 select draft-06 CA/subscriber.
-    CQRP draft-06 compatibility and external interoperability are not asserted.
+    Explicit CQRP profiles compose the unambiguous native artifact revision.
+    External interoperability and complete Chrome operational compliance are not asserted.
     It does not describe capabilities of
     the upstream hosted services or container images.
   contact:
@@ -29,7 +30,7 @@ paths:
       summary: Lint a Certificate
       description: >-
         Lints a complete X.509 Certificate or Precertificate. Experimental MTC
-        draft-05/draft-06 and CQRP v0.2.0 linting is selected with an explicit MTC
+        draft-05/draft-06 and CQRP v0.3.0 linting is selected with an explicit MTC
         profile; autodetection never selects CQRP. CA and Subscriber profiles apply different rule sets:
         CA profiles inspect CA parameters and
         certificate-local mtc-tlog settings, while Subscriber profiles inspect
@@ -378,7 +379,7 @@ components:
                   Finding: "Profile: cqrp_mtc_subscriber; Version: <pkimetal-version>"
                   Severity: meta
                 - Linter: cqrplint
-                  Finding: "Queued: <duration>; Runtime: <duration>; Version: v0.2.0"
+                  Finding: "Queued: <duration>; Runtime: <duration>; Version: v0.3.0"
                   Severity: meta
                 - Linter: mtclint
                   Finding: "Queued: <duration>; Runtime: <duration>; Version: draft-05"

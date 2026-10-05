@@ -26,8 +26,8 @@ func TestMTCPolicyLintersRegisterPublicMetadata(t *testing.T) {
 		},
 		{
 			name:             "cqrplint",
-			formattedVersion: "v0.2.0",
-			url:              "https://github.com/pkimetal/pkimetal/blob/main/doc/superpowers/specs/2026-08-11-mtc-pkimetal-design.md#source-baselines",
+			formattedVersion: "v0.3.0",
+			url:              "https://googlechrome.github.io/chromerootprogram/cqrp/draft-policy/",
 			supported:        []linter.ProfileId{linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER},
 		},
 		{

@@ -57,8 +57,8 @@ func lintMTCTlogForKind(artifact *Artifact, expected ArtifactKind, required bool
 	if required {
 		rules = append(rules, Rule{
 			Code:       "e_cqrp_ca_mtc_tlog_extension_missing",
-			Source:     cqrp020Source,
-			Section:    "4.6.1",
+			Source:     cqrp030Source,
+			Section:    "2.4.3.1",
 			Kinds:      caKinds,
 			InputKinds: bothInputKinds,
 			Evaluate: func(a *Artifact) *Finding {

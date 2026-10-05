@@ -10,7 +10,7 @@ import (
 )
 
 var mtcTlogExpectations = map[string]findingExpectation{
-	"e_cqrp_ca_mtc_tlog_extension_missing": {"e_cqrp_ca_mtc_tlog_extension_missing", Error, "tbsCertificate.extensions.mtcTlogPrefixURL", "CQRP v0.2.0", "4.6.1"},
+	"e_cqrp_ca_mtc_tlog_extension_missing": {"e_cqrp_ca_mtc_tlog_extension_missing", Error, "tbsCertificate.extensions.mtcTlogPrefixURL", "CQRP v0.3.0", "2.4.3.1"},
 	"e_mtc_tlog_ca_cosigner_not_mldsa44":   {"e_mtc_tlog_ca_cosigner_not_mldsa44", Error, "tbsCertificate.subjectPublicKeyInfo.algorithm,tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105", "Cosigners"},
 	"e_mtc_tlog_extension_critical":        {"e_mtc_tlog_extension_critical", Error, "tbsCertificate.extensions.mtcTlogPrefixURL", "C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105", "Parameters"},
 	"e_mtc_tlog_extension_duplicate":       {"e_mtc_tlog_extension_duplicate", Error, "tbsCertificate.extensions.mtcTlogPrefixURL", "C2SP mtc-tlog @ 3bc97b2329fee167f7ff39efbbbc316c84876105", "Parameters"},

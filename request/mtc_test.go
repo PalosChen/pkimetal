@@ -35,8 +35,8 @@ func TestMTCProfileMetadataAndClassification(t *testing.T) {
 	}{
 		{linter.MTC_CA, "mtc_ca", "draft-ietf-plants-merkle-tree-certs-05", "MTC Certification Authority Certificate"},
 		{linter.MTC_SUBSCRIBER, "mtc_subscriber", "draft-ietf-plants-merkle-tree-certs-05", "MTC Subscriber Certificate"},
-		{linter.CQRP_MTC_CA, "cqrp_mtc_ca", "CQRP v0.2.0", "CQRP MTC CA Cosigning Certificate"},
-		{linter.CQRP_MTC_SUBSCRIBER, "cqrp_mtc_subscriber", "CQRP v0.2.0", "CQRP MTC Subscriber TLS Certificate"},
+		{linter.CQRP_MTC_CA, "cqrp_mtc_ca", "CQRP v0.3.0", "CQRP MTC CA Cosigning Certificate"},
+		{linter.CQRP_MTC_SUBSCRIBER, "cqrp_mtc_subscriber", "CQRP v0.3.0", "CQRP MTC Subscriber TLS Certificate"},
 	}
 
 	if linter.MTC_CA != linter.BIMIGROUP_LEAF_VERIFIEDMARK_PRECERTIFICATE+1 {

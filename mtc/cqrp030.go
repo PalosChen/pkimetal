@@ -10,7 +10,7 @@ import (
 	"unicode/utf8"
 )
 
-const cqrp020Source = "CQRP v0.2.0"
+const cqrp030Source = "CQRP v0.3.0"
 
 var (
 	oidCertificatePolicies = asn1.ObjectIdentifier{2, 5, 29, 32}
@@ -29,40 +29,40 @@ var (
 	mlDSA87AlgorithmDER = []byte{0x30, 0x0b, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x13}
 )
 
-var cqrp020Rules = []Rule{
-	cqrp020Rule("e_cqrp_ca_signature_algorithm", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+var cqrp030Rules = []Rule{
+	cqrp030Rule("e_cqrp_ca_signature_algorithm", "2.4.3.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		if a.CAParameters != nil && !a.CAParameters.SignatureAlgorithm.Algorithm.Equal(OIDMLDSA44) {
 			return errorFinding("tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "CA cosigner signature algorithm is not ML-DSA-44")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_ca_signature_parameters_present", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_ca_signature_parameters_present", "2.4.3.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		if a.CAParameters != nil && a.CAParameters.SignatureAlgorithm.Algorithm.Equal(OIDMLDSA44) && a.CAParameters.SignatureAlgorithm.ParametersPresent {
 			return errorFinding("tbsCertificate.extensions.mtcCertificationAuthority.sigAlg.parameters", "ML-DSA-44 CA cosigner signature algorithm parameters are present")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_ca_signature_algorithm_encoding", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_ca_signature_algorithm_encoding", "2.4.3.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		if a.CAParameters != nil && a.CAParameters.SignatureAlgorithm.Algorithm.Equal(OIDMLDSA44) && !bytes.Equal(a.CAParameters.SignatureAlgorithm.Raw, mlDSA44AlgorithmDER) {
 			return errorFinding("tbsCertificate.extensions.mtcCertificationAuthority.sigAlg", "ML-DSA-44 CA cosigner signature AlgorithmIdentifier does not have the required encoding")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_ca_spki_algorithm", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_ca_spki_algorithm", "2.4.3.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		algorithm := a.SubjectPublicKey.Algorithm.Algorithm
 		if !algorithm.Equal(OIDMLDSA44) && !isHashMLDSA(algorithm) {
 			return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "CA subject public key algorithm is not ML-DSA-44")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_ca_spki_parameters_present", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_ca_spki_parameters_present", "2.4.3.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		algorithm := a.SubjectPublicKey.Algorithm
 		if algorithm.Algorithm.Equal(OIDMLDSA44) && algorithm.ParametersPresent {
 			return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm.parameters", "ML-DSA-44 parameters are present")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_ca_spki_encoding", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_ca_spki_encoding", "2.4.3.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		algorithm := a.SubjectPublicKey.Algorithm
 		if algorithm.Algorithm.Equal(OIDMLDSA44) {
 			if !bytes.Equal(algorithm.Raw, mlDSA44AlgorithmDER) {
@@ -74,13 +74,13 @@ var cqrp020Rules = []Rule{
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_ca_hash_mldsa", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_ca_hash_mldsa", "2.4.3.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		if isHashMLDSA(a.SubjectPublicKey.Algorithm.Algorithm) {
 			return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "CA subject public key uses prohibited HashML-DSA")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_ca_key_usage_not_critical", "4.5.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_ca_key_usage_not_critical", "2.4.3.1", caKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidKeyUsage)
 		if len(extensions) > 1 {
 			return errorFinding("tbsCertificate.extensions.keyUsage", "CA key usage extension is duplicated, which violates the certificate profile and RFC 5280")
@@ -92,20 +92,27 @@ var cqrp020Rules = []Rule{
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_validity_too_long", "2.1", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_validity_too_long", "2.6.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		if a.NotAfter.Sub(a.NotBefore) > 47*24*time.Hour {
 			return errorFinding("tbsCertificate.validity", "subscriber certificate validity exceeds 47 days")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_mldsa_parameters_present", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_log_number_not_trusted", "2.5.1.3", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+		logNumber, _, ok := SplitSerial(a.SerialNumber)
+		if ok && logNumber > 4 {
+			return errorFinding("tbsCertificate.serialNumber", "subscriber certificate log number exceeds Chrome's trusted range")
+		}
+		return nil
+	}),
+	cqrp030Rule("e_cqrp_subscriber_mldsa_parameters_present", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		algorithm := a.SubjectPublicKey.Algorithm
 		if isPureMLDSA(algorithm.Algorithm) && algorithm.ParametersPresent {
 			return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm.parameters", "ML-DSA parameters are present")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_mldsa_encoding", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_mldsa_encoding", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		algorithm := a.SubjectPublicKey.Algorithm
 		if !isHashMLDSA(algorithm.Algorithm) && !algorithm.Algorithm.Equal(oidRSAEncryption) && !algorithm.Algorithm.Equal(oidECPublicKey) && !isPureMLDSA(algorithm.Algorithm) {
 			return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "subscriber subject public key algorithm is not permitted by the TLS BR or CQRP profile")
@@ -120,33 +127,33 @@ var cqrp020Rules = []Rule{
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_hash_mldsa", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_hash_mldsa", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		if isHashMLDSA(a.SubjectPublicKey.Algorithm.Algorithm) {
 			return errorFinding("tbsCertificate.subjectPublicKeyInfo.algorithm", "subscriber subject public key uses prohibited HashML-DSA")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_dv_subject_not_empty", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_dv_subject_not_empty", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		policies, ok := subscriberPolicies(a)
 		if ok && containsOID(policies, oidPolicyDV) && !bytes.Equal(a.SubjectRaw, []byte{0x30, 0x00}) {
 			return errorFinding("tbsCertificate.subject", "DV subscriber subject is not empty")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_policies_missing", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_policies_missing", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		if countExtensions(a, oidCertificatePolicies) == 0 {
 			return errorFinding("tbsCertificate.extensions.certificatePolicies", "certificate policies extension is missing")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_policies_critical", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_policies_critical", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidCertificatePolicies)
 		if anyCritical(extensions) {
 			return errorFinding("tbsCertificate.extensions.certificatePolicies", "certificate policies extension is critical")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_policy_identifier", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_policy_identifier", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		if countExtensions(a, oidCertificatePolicies) > 1 {
 			return errorFinding("tbsCertificate.extensions.certificatePolicies", "certificate policies extension is duplicated")
 		}
@@ -156,7 +163,7 @@ var cqrp020Rules = []Rule{
 		}
 		return nil
 	}),
-	cqrp020Rule("w_cqrp_subscriber_policy_qualifiers", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("w_cqrp_subscriber_policy_qualifiers", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidCertificatePolicies)
 		if len(extensions) != 1 {
 			return nil
@@ -167,7 +174,7 @@ var cqrp020Rules = []Rule{
 		}
 		return nil
 	}),
-	cqrp020Rule("w_cqrp_subscriber_policy_not_dv", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("w_cqrp_subscriber_policy_not_dv", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		policies, ok := allowedSubscriberPolicies(a)
 		if !ok || len(policies) != 1 {
 			return nil
@@ -177,34 +184,34 @@ var cqrp020Rules = []Rule{
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_eku_missing", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_eku_missing", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		if countExtensions(a, oidExtendedKeyUsage) == 0 {
 			return errorFinding("tbsCertificate.extensions.extKeyUsage", "extended key usage extension is missing")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_eku_critical", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_eku_critical", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidExtendedKeyUsage)
 		if anyCritical(extensions) {
 			return errorFinding("tbsCertificate.extensions.extKeyUsage", "extended key usage extension is critical")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_eku_only_server_auth", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_eku_only_server_auth", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidExtendedKeyUsage)
 		if len(extensions) > 1 || len(extensions) == 1 && !isOnlyServerAuthEKU(extensions[0].Value) {
 			return errorFinding("tbsCertificate.extensions.extKeyUsage", "extended key usage is not exactly id-kp-serverAuth")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_ian_critical", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_ian_critical", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidIssuerAlternativeName)
 		if anyCritical(extensions) {
 			return errorFinding("tbsCertificate.extensions.issuerAlternativeName", "issuer alternative name extension is critical")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_ian_form", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_ian_form", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidIssuerAlternativeName)
 		if len(extensions) > 1 {
 			return errorFinding("tbsCertificate.extensions.issuerAlternativeName", "issuer alternative name extension is duplicated")
@@ -216,7 +223,7 @@ var cqrp020Rules = []Rule{
 		}
 		return nil
 	}),
-	cqrp020Rule("w_cqrp_subscriber_ian_name_attributes", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("w_cqrp_subscriber_ian_name_attributes", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		extensions := matchingExtensions(a, oidIssuerAlternativeName)
 		if len(extensions) == 1 {
 			otherAttributes, ok := parseIssuerAlternativeNames(extensions[0].Value)
@@ -226,13 +233,13 @@ var cqrp020Rules = []Rule{
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_sct_present", "4.5.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_sct_present", "2.4.3.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
 		if countExtensions(a, oidSCTList) != 0 {
 			return errorFinding("tbsCertificate.extensions.signedCertificateTimestampList", "signed certificate timestamp list extension is present")
 		}
 		return nil
 	}),
-	cqrp020Rule("e_cqrp_subscriber_standalone_cosignatures", "4.7", subscriberKinds, certificateInputKinds, func(a *Artifact) *Finding {
+	cqrp030Rule("e_cqrp_subscriber_standalone_cosignatures", "2.4.5", subscriberKinds, certificateInputKinds, func(a *Artifact) *Finding {
 		if proofAvailable(a) && len(a.Proof.Signatures) != 0 && len(a.Proof.Signatures) < 2 {
 			return errorFinding("signatureValue.signatures", "standalone certificate has fewer than two cosignatures")
 		}
@@ -240,26 +247,26 @@ var cqrp020Rules = []Rule{
 	}),
 }
 
-// LintCQRP020 evaluates the CQRP v0.2.0 profile, including the CA-only
+// LintCQRP030 evaluates the CQRP v0.3.0 profile, including the CA-only
 // certificate-local mtc-tlog requirements.
-func LintCQRP020(artifact *Artifact) []Finding {
-	return lintCQRP020(artifact)
+func LintCQRP030(artifact *Artifact) []Finding {
+	return lintCQRP030(artifact)
 }
 
-// CQRP020RuleCodes returns the stable finding codes registered for CQRP
-// v0.2.0.
-func CQRP020RuleCodes() []string {
-	codes := make([]string, len(cqrp020Rules))
-	for i, rule := range cqrp020Rules {
+// CQRP030RuleCodes returns the stable finding codes registered for CQRP
+// v0.3.0.
+func CQRP030RuleCodes() []string {
+	codes := make([]string, len(cqrp030Rules))
+	for i, rule := range cqrp030Rules {
 		codes[i] = rule.Code
 	}
 	sort.Strings(codes)
 	return codes
 }
 
-// LintCQRP020ForKind evaluates CQRP rules in an explicit profile context
+// LintCQRP030ForKind evaluates CQRP rules in an explicit profile context
 // without changing the parsed artifact or reusing proof state from another kind.
-func LintCQRP020ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
+func LintCQRP030ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
 	if artifact == nil || expected != ArtifactCA && expected != ArtifactSubscriber {
 		return nil
 	}
@@ -268,13 +275,39 @@ func LintCQRP020ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
 	local.Proof = nil
 	local.ProofParseError = nil
 	if expected == ArtifactSubscriber && local.InputKind == InputCertificate {
-		local.Proof, local.ProofParseError = ParseProof(local.SignatureValue)
+		revision := local.Revision
+		if revision == "" {
+			revision = "05"
+		}
+		local.Proof, local.ProofParseError = ParseProofForRevision(local.SignatureValue, revision)
+		if local.RevisionError != nil {
+			local.Proof = nil
+			local.ProofParseError = local.RevisionError
+		}
 	}
-	return lintCQRP020(&local)
+	return lintCQRP030(&local)
 }
 
-func lintCQRP020(artifact *Artifact) []Finding {
-	findings := runRules(artifact, cqrp020Rules)
+// LintCQRP020 retains the historical exported name for source compatibility.
+// Deprecated: use LintCQRP030. This alias evaluates the current v0.3.0 policy.
+func LintCQRP020(artifact *Artifact) []Finding {
+	return LintCQRP030(artifact)
+}
+
+// CQRP020RuleCodes retains the historical exported name for source compatibility.
+// Deprecated: use CQRP030RuleCodes. This alias lists the current v0.3.0 rules.
+func CQRP020RuleCodes() []string {
+	return CQRP030RuleCodes()
+}
+
+// LintCQRP020ForKind retains the historical exported name for source compatibility.
+// Deprecated: use LintCQRP030ForKind. This alias evaluates the current v0.3.0 policy.
+func LintCQRP020ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
+	return LintCQRP030ForKind(artifact, expected)
+}
+
+func lintCQRP030(artifact *Artifact) []Finding {
+	findings := runRules(artifact, cqrp030Rules)
 	if artifact == nil || artifact.Kind != ArtifactCA {
 		return findings
 	}
@@ -283,8 +316,8 @@ func lintCQRP020(artifact *Artifact) []Finding {
 	return findings
 }
 
-func cqrp020Rule(code, section string, kinds []ArtifactKind, inputKinds []InputKind, evaluate func(*Artifact) *Finding) Rule {
-	return Rule{Code: code, Source: cqrp020Source, Section: section, Kinds: kinds, InputKinds: inputKinds, Evaluate: evaluate}
+func cqrp030Rule(code, section string, kinds []ArtifactKind, inputKinds []InputKind, evaluate func(*Artifact) *Finding) Rule {
+	return Rule{Code: code, Source: cqrp030Source, Section: section, Kinds: kinds, InputKinds: inputKinds, Evaluate: evaluate}
 }
 
 func isPureMLDSA(oid asn1.ObjectIdentifier) bool {

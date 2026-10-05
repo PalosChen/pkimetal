@@ -45,10 +45,9 @@ an old-binary downgrade is not supported.
 
 Runtime C2SP remains `d0fe789122c75b903bfc1680b0b8b8dc570f0db3`;
 lint C2SP remains `3bc97b2329fee167f7ff39efbbbc316c84876105`; independent
-CQRP remains `v0.2.0`. Older MTC links in pinned C2SP do not replace explicit
+CQRP is explicitly updated to `v0.3.0`; source provenance and boundaries are
+recorded below. Older MTC links in pinned C2SP do not replace explicit
 revision-specific MTC structures; C2SP HTTP/signature profiles stay pinned.
-The authoritative CQRP artifact/checksum is absent, so independent CQRP-06
-policy conformance is not asserted and existing policy is not relaxed.
 
 Local codec, Merkle/vector, mixed-history, H2 migration/concurrency/restart,
 ACME, CRL and Linux Nginx route tests establish scoped implementation evidence.
@@ -97,14 +96,12 @@ identity are not locally decidable certificate lints.
 
 ## CQRP Overlay
 
-The `cqrp_mtc_ca` and `cqrp_mtc_subscriber` profiles are pinned to a
-user-supplied local `CQRP v0.2.0` draft. CQRP is an explicit policy assertion,
-not an encoding that autodetection may infer.
-
-The authoritative CQRP source artifact is not stored in this repository. Do
-not change CQRP findings until the authoritative source is obtained and its
-title, publication date, origin and SHA-256 digest are recorded here. Do not
-reinterpret this baseline as a later CQRP revision or a generic MTC draft.
+The `cqrp_mtc_ca` and `cqrp_mtc_subscriber` profiles are pinned to official
+`CQRP v0.3.0` (2026-08-14). CQRP is an explicit policy assertion, not an encoding
+that autodetection may infer. Both profiles retain their IDs and choose the
+native MTC-05/06 rules and proof parser from unambiguous artifact identity.
+The official original-source hashes and qualification boundaries are recorded
+below.
 
 CQRP overrides MTC, RFC 5280 or TLS BR requirements only where the pinned CQRP
 text explicitly does so.
@@ -123,3 +120,41 @@ Before changing a pin, diff normative text and audit every stable finding code,
 source/section citation, profile registration, severity and applicability path.
 Add positive, negative, malformed-input and cross-profile regression tests, and
 update public rule coverage in the same delivery.
+
+## CQRP v0.3.0 source and audit boundary
+
+The policy baseline is **[DRAFT] Chrome Quantum-resistant Root Program Policy,
+Version 0.3.0**, last updated **2026-08-14**, published by Google Chrome Root
+Programs. This update was explicitly requested on 2026-10-05; v0.2.0 is no
+longer an acceptance baseline. The v0.3.0 original was audited directly against
+the implementation; obtaining or comparing the superseded v0.2.0 is not a gate.
+
+- Official HTML: https://googlechrome.github.io/chromerootprogram/cqrp/draft-policy/
+- Original HTML SHA-256: `08820aaa2c06117a079a904bf2575ee8b8291e724fe63658b2a82baa93cb1e68`.
+- Immutable official source: https://github.com/GoogleChrome/chromerootprogram/blob/65873796fe3bf4b7738fadbd35cb73396a7ddb37/content/cqrp/draft-policy.md
+- Original Markdown SHA-256: `b084b7ad85985fbc31d7b2795204a05cc3a6d17ef4760c4aac0ca34ac8324393`.
+
+CQRP applies only to its explicit Chrome policy scope and overrides compatible
+MTC/RFC/BR requirements only where its text says so. Native MTC-05/06 and C2SP
+pins, CA keys and immutable historical artifacts remain unchanged. CQRP lint
+profiles explicitly compose the selected artifact revision with v0.3.0; proof
+framing or URLs never choose a revision. Subscriber N > 4 is rejected by the
+CQRP overlay (§2.5.1.3); native MTC serial domains remain unchanged.
+
+Source provenance is established; complete Chrome policy compliance is not.
+§2.4 requires BOTH standalone and landmark-relative forms; the known MTC-06
+§6.4.3 zero-sentinel publication boundary remains unresolved. §2.5.1.2 permits
+same-key replacement of an inoperable log and requires a public incident for
+every rotation: local N2 tests do not approve routine protocol-driven rotation.
+Effective machine-readable profiles/CP-CPS (§2.3.2), ten-day DCV reuse and ARI
+operational tests (§§2.4.1–2.4.2), independent Usable/pre-freeze Frozen mirrors
+(§2.4.5), availability/retention evidence (§§2.5, 3.2), active-key roles/HSM/
+ceremonies/key schedules (§2.6), and Chrome registry/operator obligations require
+external qualification. §2.3.1 delegates to latest BR; the independently pinned
+BR 2.2.8 has not been silently upgraded or certified as satisfying that mandate.
+
+Additional certificate-local gaps remain in the legacy CA/TC PoC: subscriber
+key policy still permits Ed25519, and its RSA/EC checks do not establish all BR
+parameter constraints. The CQRP lint overlay rejects Ed25519; that does not
+prove every issuer path invokes it. These are implementation follow-ups, not
+external-only qualification, and no complete CQRP conformance is asserted.

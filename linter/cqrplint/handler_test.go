@@ -25,10 +25,10 @@ func TestRegistration(t *testing.T) {
 		t.Fatalf("cqrplint registrations = %d, want 1", len(registered))
 	}
 	got := registered[0]
-	if got.Version != "v0.2.0" {
-		t.Errorf("version = %q, want v0.2.0", got.Version)
+	if got.Version != "v0.3.0" {
+		t.Errorf("version = %q, want v0.3.0", got.Version)
 	}
-	if got.Url != "https://github.com/pkimetal/pkimetal/blob/main/doc/superpowers/specs/2026-08-11-mtc-pkimetal-design.md#source-baselines" {
+	if got.Url != "https://googlechrome.github.io/chromerootprogram/cqrp/draft-policy/" {
 		t.Errorf("URL = %q", got.Url)
 	}
 	if got.NumInstances != 1 {
