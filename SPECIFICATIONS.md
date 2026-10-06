@@ -2,6 +2,10 @@
 
 ## Draft-06 Capability And Retained Legacy Profile
 
+The selected 06 baseline includes the §6.4.3 PR #337 erratum; use
+[the parent baseline](../SPECIFICATIONS.md#draft-06-pr-337-erratum-2026-10-06)
+for its immutable commit, normative checklist and readers-first rollout.
+
 Implemented target: `draft-ietf-plants-merkle-tree-certs-06` with
 `draft-ietf-tls-trust-anchor-ids-05`. Retained compatibility profile:
 `draft-ietf-plants-merkle-tree-certs-05` with
@@ -33,9 +37,11 @@ the log number, and current registry identity, cryptographic quorum and current
 public checkpoint/document coverage pass. Missing history stays unresolved,
 never inferred from emitted_at/current configuration or fabricated as zero.
 Read-node document parsing is keyless validation, not signature verification.
-MTC-06 §6.4.3's landmark-zero/expired-sentinel row-count ambiguity returns 503
-for the new view; legacy remains available. No strict conformance claim is made
-at that boundary.
+MTC-06 §6.4.3 plus the pinned PR #337 erratum accepts the real landmark-zero
+sentinel at genesis and while all positive landmarks remain active. Strict
+syntax/order/expiry checks and matching public-document/checkpoint/CA/quorum
+guards remain mandatory. Missing covering landmarks still keep optimized
+issuance pending; this does not establish full standards or live conformance.
 
 Deploy additive schema and dual readers before enabling writers; backfill and
 validate history/archives/CRLs/prefixes/public views first. Rollback disables
@@ -68,7 +74,7 @@ repository automatically.
 
 | Specification | Pinned baseline | Lint scope | Source |
 | --- | --- | --- | --- |
-| Merkle Tree Certificates | `draft-ietf-plants-merkle-tree-certs-06` | MTC CA and subscriber syntax/profile rules | https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06 |
+| Merkle Tree Certificates | `draft-ietf-plants-merkle-tree-certs-06` + pinned PR #337 (§6.4.3) | MTC CA and subscriber syntax/profile rules | https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06 |
 | TLS Trust Anchor Identifiers | `draft-ietf-tls-trust-anchor-ids-05` | Relative OID and Trust Anchor ID syntax | https://datatracker.ietf.org/doc/html/draft-ietf-tls-trust-anchor-ids-05 |
 | Unsigned X.509 Certificates | RFC 9925 | Conditional unsigned CA-certificate rules | https://www.rfc-editor.org/rfc/rfc9925.html |
 | ML-DSA Algorithm Identifiers for PKIX | RFC 9881 | AlgorithmIdentifier and OID checks | https://www.rfc-editor.org/rfc/rfc9881.html |
@@ -142,8 +148,9 @@ framing or URLs never choose a revision. Subscriber N > 4 is rejected by the
 CQRP overlay (§2.5.1.3); native MTC serial domains remain unchanged.
 
 Source provenance is established; complete Chrome policy compliance is not.
-§2.4 requires BOTH standalone and landmark-relative forms; the known MTC-06
-§6.4.3 zero-sentinel publication boundary remains unresolved. §2.5.1.2 permits
+§2.4 requires BOTH standalone and landmark-relative forms; the selected MTC-06
+plus PR #337 baseline resolves the §6.4.3 row-count boundary. Availability and
+external qualification of both forms still require evidence. §2.5.1.2 permits
 same-key replacement of an inoperable log and requires a public incident for
 every rotation: local N2 tests do not approve routine protocol-driven rotation.
 Effective machine-readable profiles/CP-CPS (§2.3.2), ten-day DCV reuse and ARI
