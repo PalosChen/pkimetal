@@ -237,6 +237,8 @@ func testMTCExplicitProfiles(t *testing.T, h *mtcHTTPTestServer) {
 	}{
 		{"mtc_ca", mtctest.Certificate(mtctest.ValidCATemplate())},
 		{"mtc_subscriber", mtctest.Certificate(mtctest.ValidSubscriberTemplate())},
+		{"mtc_draft07_ca", mtctest.Certificate(mtctest.ValidDraft07CATemplate())},
+		{"mtc_draft07_subscriber", mtctest.Certificate(mtctest.ValidDraft07SubscriberTemplate())},
 		{"cqrp_mtc_ca", mtctest.Certificate(mtctest.ValidCQRPCATemplate())},
 		{"cqrp_mtc_subscriber", mtctest.Certificate(mtctest.ValidCQRPSubscriberTemplate())},
 	}
@@ -259,6 +261,8 @@ func testMTCDraftAutodetection(t *testing.T, h *mtcHTTPTestServer) {
 	}{
 		{"draft CA", mtctest.Certificate(mtctest.ValidCATemplate()), "mtc_ca"},
 		{"draft subscriber", mtctest.Certificate(mtctest.ValidSubscriberTemplate()), "mtc_subscriber"},
+		{"draft07 CA", mtctest.Certificate(mtctest.ValidDraft07CATemplate()), "mtc_draft07_ca"},
+		{"draft07 subscriber", mtctest.Certificate(mtctest.ValidDraft07SubscriberTemplate()), "mtc_draft07_subscriber"},
 		{"CQRP CA fixture", mtctest.Certificate(mtctest.ValidCQRPCATemplate()), "mtc_ca"},
 		{"CQRP subscriber fixture", mtctest.Certificate(mtctest.ValidCQRPSubscriberTemplate()), "mtc_subscriber"},
 	}

@@ -1,11 +1,12 @@
 # MTC and CQRP rule coverage
 
-This fork implements explicit draft-06 and retained draft-05 experimental MTC linting.
+This fork implements explicit draft-07 with retained draft-06/draft-05 experimental MTC linting.
 Profiles 105-108 retain their names and meanings; 109 is `mtc_draft06_ca` and
-110 is `mtc_draft06_subscriber`. Complete certificates and TBS artifacts are
+110 is `mtc_draft06_subscriber`; 111/112 are `mtc_draft07_ca` and
+`mtc_draft07_subscriber`. Complete certificates and TBS artifacts are
 supported; proof/outer-certificate rules do not apply to TBS inputs. The legacy
 MTC matrix below describes retained draft-05 findings; the CQRP v0.3.0 overlay
-applies to both unambiguous draft-05 and draft-06 artifacts.
+applies to unambiguous draft-05, draft-06 and draft-07 artifacts.
 
 The retained profile implements Merkle Tree Certificate (MTC) linting against
 [draft-ietf-plants-merkle-tree-certs-05](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05),
@@ -15,6 +16,31 @@ and official CQRP v0.3.0 (2026-08-14), pinned with original-source SHA-256 in
 reference to a later or generic MTC Internet-Draft.
 
 ## Profiles and precedence
+
+### Draft-07 profiles
+
+`mtc_draft07_ca` / `mtc_draft07_subscriber` pin MTC-07 and TAI-06; original
+text hashes and rollout boundaries are in SPECIFICATIONS.md. Existing stable
+codes, severities, fields and input/kind applicability are retained, with
+MTC-07 citations and TAI-06 §4 for cosigner ID syntax. Formal OIDs are proof
+`1.3.6.1.5.5.7.6.67`, Name `1.3.6.1.5.5.7.25.3`, critical SHA-256 CA
+extension `1.3.6.1.5.5.7.1.38`. Name remains RELATIVE-OID; the three CA
+parameters, absent proof parameters, vector24 framing, ordering/uniqueness,
+nonempty subtree, serial and reconstructed entry-size checks remain required.
+
+07 Name/cosigner IDs are bounded at 32 bytes, while retained 05/06 accept up
+to 255. Large components retain canonical binary bytes without integer
+conversion or overflow. A rejected proof length preserves diagnostic syntax
+for both fatal proof and TAI ID findings. Explicit mismatched profiles and
+conflicting identity cannot silently convert old artifacts.
+
+MTC-07 §§6.2,6.4.4 permits arbitrary-byte GREASE on landmark-relative proofs.
+The CQRP standalone-count rule therefore does not apply to 07 without trusted
+subtree/cosigner context. No local signature count establishes authentication
+or quorum, and unused GREASE IDs' lifetime non-reuse cannot be decided here.
+Landmark documents (§6.4.3), signature-input component conversion (§5.3.1),
+TLS negotiation and external registry state remain outside this local API.
+Independent C2SP/CQRP/BR pins remain unchanged.
 
 ### Draft-06 profiles
 
@@ -65,7 +91,7 @@ is inferred by these structural lints.
 
 The explicit profiles are `mtc_ca`, `mtc_subscriber`, `cqrp_mtc_ca`, and
 `cqrp_mtc_subscriber`. The two CQRP profiles run both `mtclint` for the selected
-draft-05/draft-06 artifact and `cqrplint` for the CQRP v0.3.0 overlay. CQRP overrides the TLS Baseline
+draft-05/draft-06/draft-07 artifact and `cqrplint` for the CQRP v0.3.0 overlay. CQRP overrides the TLS Baseline
 Requirements only where CQRP v0.3.0 says so explicitly. Likewise, draft-05
 overrides RFC 5280 only where draft-05 says so explicitly; compatible RFC 5280
 and TLS checks remain delegated to other registered linters.
@@ -106,8 +132,9 @@ signature, absent issuerUniqueID, and warnings for authorityKeyIdentifier or
 issuerAltName.
 
 CQRP §2.5.1.3 rejects subscriber log numbers above 4 in Certificate and TBS
-inputs. §2.4.5 proof checks use vector16 for draft-05 and vector24 for draft-06;
-TBS inputs do not have a proof. Signature count is structural evidence only:
+inputs. §2.4.5 proof checks use vector16 for draft-05 and vector24 for draft-06/07;
+TBS inputs do not have a proof. The signature-count finding applies only to
+05/06; 07 cannot classify form with GREASE. Legacy count is structural evidence only:
 trusted CA/Mirror identities, Usable/pre-freeze Frozen registry state and
 operator independence still need external verification.
 

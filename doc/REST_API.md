@@ -62,7 +62,8 @@ Browse (i.e., send a GET request) to any of the POST endpoints.
 
 ## Experimental MTC certificate API
 
-This fork supports [MTC draft-06](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06)
+This fork supports [MTC draft-07](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-07)
+with TAI-06, retained [MTC draft-06](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06)
 with TAI-05 and retained [MTC draft-05](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05)
 with TAI-04,
 and the official CQRP v0.3.0 policy overlay on the existing
@@ -75,23 +76,30 @@ Profile | Artifact | Native linters
 --- | --- | ---
 `mtc_ca` | MTC CA Certificate or TBSCertificate | `mtclint` draft-05
 `mtc_subscriber` | MTC subscriber Certificate or TBSCertificate | `mtclint` draft-05
-`cqrp_mtc_ca` | CQRP MTC CA cosigning Certificate or TBSCertificate | `mtclint` selected draft-05/draft-06 and `cqrplint` v0.3.0
-`cqrp_mtc_subscriber` | CQRP MTC subscriber TLS Certificate or TBSCertificate | `mtclint` selected draft-05/draft-06 and `cqrplint` v0.3.0
+`cqrp_mtc_ca` | CQRP MTC CA cosigning Certificate or TBSCertificate | `mtclint` selected draft-05/draft-06/draft-07 and `cqrplint` v0.3.0
+`cqrp_mtc_subscriber` | CQRP MTC subscriber TLS Certificate or TBSCertificate | `mtclint` selected draft-05/draft-06/draft-07 and `cqrplint` v0.3.0
 `mtc_draft06_ca` | Draft-06 CA Certificate or TBSCertificate | `mtclint` draft-06 / TAI-05
 `mtc_draft06_subscriber` | Draft-06 subscriber Certificate or TBSCertificate | `mtclint` draft-06 / TAI-05
+`mtc_draft07_ca` | Draft-07 CA Certificate or TBSCertificate | `mtclint` draft-07 / TAI-06
+`mtc_draft07_subscriber` | Draft-07 subscriber Certificate or TBSCertificate | `mtclint` draft-07 / TAI-06
 
-Profile IDs 105-108 retain their names/semantics; new draft-06 IDs are 109-110.
+Profile IDs 105-110 retain their names/semantics; draft-07 IDs are 111-112.
 CQRP v0.3.0 is pinned independently with verified original-source hashes in
-[SPECIFICATIONS.md](../SPECIFICATIONS.md). It supports unambiguous draft-05/06
+[SPECIFICATIONS.md](../SPECIFICATIONS.md). It supports unambiguous draft-05/06/07
 artifacts using their corresponding native rules and proof parser. Local linting is not evidence
 of log/quorum/registry state, deployment or external TLS/RP interoperability.
 
 An explicit profile is authoritative. CQRP is never inferred: an omitted
 profile or `profile=autodetect` can select the CA/subscriber profile matching
-unambiguous draft-05 or draft-06 identity, but
+unambiguous draft-05, draft-06 or draft-07 identity, but
 never either CQRP profile. If an explicit CA/subscriber profile conflicts with
 the detected artifact kind, the HTTP request still succeeds and `mtclint`
 returns an `e_mtc_profile_artifact_mismatch` error finding.
+
+07 uses formal OIDs and a 32-byte Trust Anchor ID limit. GREASE may accompany
+landmark-relative proofs, so local signature count cannot classify certificate
+form or validate CA/Mirror quorum. CQRP's standalone count finding is restricted
+to retained 05/06 artifacts.
 
 CQRP profiles run both the draft and CQRP native linters. CQRP replaces TLS
 Baseline Requirements only where the CQRP baseline explicitly overrides them;
@@ -151,7 +159,7 @@ metadata object. With the default `severity=meta`, the first pkimetal item names
 the selected profile and pkimetal version, for example
 `Profile: mtc_subscriber; Version: <version>`. Each native linter that ran adds
 its own `Queued: <duration>; Runtime: <duration>; Version: <version>` meta item
-(`draft-05/draft-06` for `mtclint`, `v0.3.0` for `cqrplint`).
+(`draft-05/draft-06/draft-07` for `mtclint`, `v0.3.0` for `cqrplint`).
 
 Linters that do not run are represented by a meta item containing
 `Not used [Available:<true|false>, Applicable:<true|false>]`. When present, a

@@ -209,12 +209,16 @@ func (ri *RequestInfo) GetProfile(profileName string) bool {
 				ri.profileId = linter.MTC_CA
 				if ri.mtcArtifact.Revision == "06" {
 					ri.profileId = linter.MTC_DRAFT06_CA
+				} else if ri.mtcArtifact.Revision == "07" {
+					ri.profileId = linter.MTC_DRAFT07_CA
 				}
 				return true
 			case mtc.ArtifactSubscriber:
 				ri.profileId = linter.MTC_SUBSCRIBER
 				if ri.mtcArtifact.Revision == "06" {
 					ri.profileId = linter.MTC_DRAFT06_SUBSCRIBER
+				} else if ri.mtcArtifact.Revision == "07" {
+					ri.profileId = linter.MTC_DRAFT07_SUBSCRIBER
 				}
 				return true
 			}

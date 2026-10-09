@@ -10,6 +10,9 @@ import (
 )
 
 func FuzzParseMTC(f *testing.F) {
+	f.Add(mtctest.Certificate(mtctest.ValidDraft07SubscriberTemplate()), uint8(mtc.InputCertificate))
+	f.Add(mtctest.Certificate(mtctest.ValidDraft07CATemplate()), uint8(mtc.InputCertificate))
+	f.Add(mtctest.TBSCertificate(mtctest.ValidDraft07SubscriberTemplate()), uint8(mtc.InputTBSCertificate))
 	f.Add(mtctest.Certificate(mtctest.ValidDraft06SubscriberTemplate()), uint8(mtc.InputCertificate))
 	f.Add(mtctest.Certificate(mtctest.ValidDraft06CATemplate()), uint8(mtc.InputCertificate))
 	f.Add(mtctest.TBSCertificate(mtctest.ValidDraft06SubscriberTemplate()), uint8(mtc.InputTBSCertificate))
@@ -37,6 +40,9 @@ func FuzzParseMTC(f *testing.F) {
 		}
 		if !reflect.DeepEqual(mtc.LintCQRP030(first), mtc.LintCQRP030(second)) {
 			t.Fatal("CQRP findings changed after copying input")
+		}
+		if !reflect.DeepEqual(mtc.LintDraft07ForKind(first, first.Kind), mtc.LintDraft07ForKind(second, second.Kind)) {
+			t.Fatal("draft-07 findings changed after copying input")
 		}
 	})
 }

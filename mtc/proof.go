@@ -26,7 +26,7 @@ func (e *ProofTrailingDataError) Error() string {
 	return fmt.Sprintf("MTCProof has %d trailing bytes", e.Remaining)
 }
 
-// ProofCosignerOrderError reports signatures that violate draft-06 section 6.2.
+// ProofCosignerOrderError reports signatures that violate draft-06/07 section 6.2.
 // The parsed proof is retained with this error for diagnostic linting only.
 type ProofCosignerOrderError struct {
 	Index int
@@ -34,6 +34,16 @@ type ProofCosignerOrderError struct {
 
 func (e *ProofCosignerOrderError) Error() string {
 	return fmt.Sprintf("MTCProof cosigner IDs are not strictly increasing at signature %d", e.Index)
+}
+
+// ProofCosignerIDLengthError retains the parsed proof for diagnostic linting.
+// Draft-07 depends on TAI-06 §4's 32-byte Trust Anchor ID bound.
+type ProofCosignerIDLengthError struct {
+	Index int
+}
+
+func (e *ProofCosignerIDLengthError) Error() string {
+	return fmt.Sprintf("MTCProof cosigner ID exceeds 32 bytes at signature %d", e.Index)
 }
 
 // ParseProof decodes the TLS presentation-language encoding of an MTCProof.
@@ -44,17 +54,24 @@ func ParseProof(input []byte) (*Proof, error) {
 }
 
 func ParseProofForRevision(input []byte, revision string) (*Proof, error) {
-	if revision != "05" && revision != "06" {
+	if revision != "05" && revision != "06" && revision != "07" {
 		return nil, fmt.Errorf("unsupported MTC revision %q", revision)
 	}
 	proof, err := parseProof(input, revision)
-	if err == nil && revision == "06" && proof.Start >= proof.End {
+	if err == nil && revision != "05" && proof.Start >= proof.End {
 		return nil, fmt.Errorf("MTCProof subtree must be nonempty")
 	}
-	if err == nil && revision == "06" {
+	if err == nil && revision != "05" {
 		for i := 1; i < len(proof.Signatures); i++ {
 			if compareCosignerIDs(proof.Signatures[i-1].CosignerID, proof.Signatures[i].CosignerID) >= 0 {
 				return proof, &ProofCosignerOrderError{Index: i}
+			}
+		}
+	}
+	if err == nil && revision == "07" {
+		for i, signature := range proof.Signatures {
+			if len(signature.CosignerID) > 32 {
+				return proof, &ProofCosignerIDLengthError{Index: i}
 			}
 		}
 	}
@@ -84,7 +101,7 @@ func parseProof(input []byte, revision string) (*Proof, error) {
 		return nil, err
 	}
 	var signaturesBytes []byte
-	if revision == "06" {
+	if revision != "05" {
 		signaturesBytes, err = reader.vector24("signatures")
 	} else {
 		signaturesBytes, err = reader.vector16("signatures")

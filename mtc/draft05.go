@@ -30,6 +30,7 @@ var draft05Rules = buildDraftRules("05")
 
 func buildDraftRules(revision string) []Rule {
 	caOID := OIDMTCCertificationAuthority
+	proofOID := OIDMTCProof
 	source := draft05Source
 	taiSource := trustAnchor04Source
 	taiSection := "3"
@@ -37,6 +38,13 @@ func buildDraftRules(revision string) []Rule {
 		caOID = OIDMTCCertificationAuthorityDraft06
 		source = draft06Source
 		taiSource = trustAnchor05Source
+		taiSection = "4"
+	}
+	if revision == "07" {
+		caOID = OIDMTCCertificationAuthorityDraft07
+		proofOID = OIDMTCProofDraft07
+		source = draft07Source
+		taiSource = trustAnchor06Source
 		taiSection = "4"
 	}
 	draftRule := func(code, section string, kinds []ArtifactKind, inputs []InputKind, evaluate func(*Artifact) *Finding) Rule {
@@ -53,10 +61,10 @@ func buildDraftRules(revision string) []Rule {
 			return nil
 		}),
 		draftRule("e_mtc_signature_algorithm_oid", "6.2", subscriberKinds, bothInputKinds, func(a *Artifact) *Finding {
-			if !a.TBSSignature.Algorithm.Equal(OIDMTCProof) {
+			if !a.TBSSignature.Algorithm.Equal(proofOID) {
 				return errorFinding("tbsCertificate.signature", "TBSCertificate signature algorithm is not id-alg-mtcProof")
 			}
-			if a.InputKind == InputCertificate && (a.OuterSignature == nil || !a.OuterSignature.Algorithm.Equal(OIDMTCProof)) {
+			if a.InputKind == InputCertificate && (a.OuterSignature == nil || !a.OuterSignature.Algorithm.Equal(proofOID)) {
 				return errorFinding("signatureAlgorithm", "Certificate signature algorithm is not id-alg-mtcProof")
 			}
 			return nil
@@ -116,7 +124,7 @@ func buildDraftRules(revision string) []Rule {
 			if params == nil {
 				return nil
 			}
-			if !validMTCSerialBound(params.MinSerial) || !validMTCSerialBound(params.MaxSerial) || params.MinSerial.Cmp(params.MaxSerial) > 0 || revision == "06" && params.MinSerial.Cmp(new(big.Int).Lsh(big.NewInt(1), 48)) < 0 {
+			if !validMTCSerialBound(params.MinSerial) || !validMTCSerialBound(params.MaxSerial) || params.MinSerial.Cmp(params.MaxSerial) > 0 || revision != "05" && params.MinSerial.Cmp(new(big.Int).Lsh(big.NewInt(1), 48)) < 0 {
 				return errorFinding("tbsCertificate.extensions.mtcCertificationAuthority", "MTC CA serial range is invalid")
 			}
 			return nil
@@ -273,7 +281,7 @@ func buildDraftRules(revision string) []Rule {
 				return nil
 			}
 			for _, signature := range a.Proof.Signatures {
-				if len(signature.CosignerID) != 0 && !validTrustAnchorIDBinary(signature.CosignerID) {
+				if len(signature.CosignerID) != 0 && !validTrustAnchorIDBinaryForRevision(signature.CosignerID, revision) {
 					return errorFinding("signatureValue.signatures.cosigner_id", "MTCProof cosigner ID is not a valid binary Trust Anchor ID")
 				}
 			}
@@ -489,9 +497,10 @@ func usesUnsignedAlgorithm(artifact *Artifact) bool {
 }
 
 func proofAvailable(artifact *Artifact) bool {
-	// An ordering rejection retains complete syntax for specific diagnostic rules.
+	// Semantic parser rejections retain complete syntax for diagnostic rules.
 	_, orderError := artifact.ProofParseError.(*ProofCosignerOrderError)
-	return artifact.Proof != nil && (artifact.ProofParseError == nil || orderError)
+	_, lengthError := artifact.ProofParseError.(*ProofCosignerIDLengthError)
+	return artifact.Proof != nil && (artifact.ProofParseError == nil || orderError || lengthError)
 }
 
 func proofRangeValid(proof *Proof) bool {

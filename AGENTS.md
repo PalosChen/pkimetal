@@ -3,8 +3,10 @@
 ## Revision Selection
 
 Before changing MTC/TAI behavior, read this repository's `SPECIFICATIONS.md`.
-Apply the pinned MTC-06 plus PR #337 erratum and TAI-05 only to explicitly
-selected 06 artifacts; retain MTC-05/TAI-04 legacy paths and default 05 admission.
+Apply pinned MTC-07/TAI-06 only to selected 07 artifacts; retain pinned
+MTC-06 plus PR #337/TAI-05 and MTC-05/TAI-04 profiles and historical bytes.
+Legacy profile names still select 05. A protocol upgrade preserves CAID,
+key, current Log/N and append-only history; it does not authorize rotation.
 Follow documented activation/rollback gates; preserve independent C2SP/CQRP
 pins and report unverified integration explicitly. For landmark-zero publication,
 use the immutable erratum reference and checklist in `SPECIFICATIONS.md`.

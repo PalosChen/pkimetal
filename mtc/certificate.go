@@ -365,18 +365,21 @@ func classifyArtifact(artifact *Artifact) {
 	var caExtensionValue []byte
 	caExtensionCount := 0
 	for _, extension := range artifact.Extensions {
-		if !extension.ID.Equal(OIDMTCCertificationAuthority) && !extension.ID.Equal(OIDMTCCertificationAuthorityDraft06) {
+		if !extension.ID.Equal(OIDMTCCertificationAuthority) && !extension.ID.Equal(OIDMTCCertificationAuthorityDraft06) && !extension.ID.Equal(OIDMTCCertificationAuthorityDraft07) {
 			continue
 		}
 		caExtensionCount++
-		if extension.ID.Equal(OIDMTCCertificationAuthorityDraft06) {
+		if extension.ID.Equal(OIDMTCCertificationAuthorityDraft07) {
+			evidence("07")
+		} else if extension.ID.Equal(OIDMTCCertificationAuthorityDraft06) {
 			evidence("06")
 		} else {
 			evidence("05")
 		}
 		caExtensionValue = extension.Value
 	}
-	artifact.TypeConflict = caExtensionCount != 0 && artifact.TBSSignature.Algorithm.Equal(OIDMTCProof)
+	isProof := artifact.TBSSignature.Algorithm.Equal(OIDMTCProof) || artifact.TBSSignature.Algorithm.Equal(OIDMTCProofDraft07)
+	artifact.TypeConflict = caExtensionCount != 0 && isProof
 	if caExtensionCount != 0 {
 		artifact.Kind = ArtifactCA
 		evidence(subjectRevision)
@@ -397,13 +400,16 @@ func classifyArtifact(artifact *Artifact) {
 		return
 	}
 	evidence(issuerRevision)
+	if artifact.TBSSignature.Algorithm.Equal(OIDMTCProofDraft07) {
+		evidence("07")
+	}
 	if issuerConflict {
 		artifact.RevisionError = fmt.Errorf("conflicting subscriber issuer OIDs")
 	}
 	if issuerRevision != "" {
 		artifact.IssuerCAID, _ = ParseCAIDNameForRevision(artifact.IssuerRaw, artifact.Revision)
 	}
-	if issuerRevision != "" || artifact.TBSSignature.Algorithm.Equal(OIDMTCProof) {
+	if issuerRevision != "" || isProof {
 		artifact.Kind = ArtifactSubscriber
 	}
 }
@@ -442,6 +448,9 @@ func caIDNameRevision(input []byte) (string, bool) {
 			}
 			if oid.Equal(OIDCAIDDraft06) {
 				found = "06"
+			}
+			if oid.Equal(OIDCAIDDraft07) {
+				found = "07"
 			}
 			if found != "" {
 				if revision != "" && revision != found {

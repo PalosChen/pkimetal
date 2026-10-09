@@ -29,7 +29,7 @@ func registeredZlint(t *testing.T) *linter.Linter {
 
 func TestRegistrationDeclaresMTCApplicability(t *testing.T) {
 	registered := registeredZlint(t)
-	want := []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER}
+	want := []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER}
 	if !slices.Equal(registered.Supported, want) {
 		t.Fatalf("supported profiles = %#v, want %#v", registered.Supported, want)
 	}
@@ -48,7 +48,7 @@ func TestRegistrationDeclaresMTCApplicability(t *testing.T) {
 	if applicable, reason := registered.Applicable(&linter.LintingRequest{ProfileId: linter.RFC5280_ROOT}); !applicable || reason != "" {
 		t.Fatalf("legacy applicability = %t, %q", applicable, reason)
 	}
-	for _, profile := range []linter.ProfileId{linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER} {
+	for _, profile := range []linter.ProfileId{linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER} {
 		if applicable, reason := registered.Applicable(&linter.LintingRequest{ProfileId: profile}); applicable || reason != "zcrypto could not safely parse this MTC artifact" {
 			t.Fatal("draft06 nil certificate not skipped")
 		}
@@ -77,7 +77,7 @@ func TestCQRPMTCLeafRegistryExcludesOnlyKnownMTCConflicts(t *testing.T) {
 }
 
 func TestMTCRegistrySelection(t *testing.T) {
-	for _, profile := range []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER} {
+	for _, profile := range []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER} {
 		registry := registryForProfile(profile)
 		for _, source := range []lint.LintSource{
 			lint.CABFBaselineRequirements,
@@ -102,7 +102,7 @@ func TestMTCProfilesRunCompatibleSerialLint(t *testing.T) {
 	cert := syntheticZcryptoCertificate(t)
 	cert.SerialNumber = new(big.Int).Lsh(big.NewInt(1), 160)
 
-	for _, profile := range []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER} {
+	for _, profile := range []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER} {
 		results := (&Zlint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{
 			Cert:      cert,
 			ProfileId: profile,

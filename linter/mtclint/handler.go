@@ -20,10 +20,10 @@ const (
 func init() {
 	(&linter.Linter{
 		Name:         "mtclint",
-		Version:      "draft-05/draft-06",
-		Url:          "https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06",
-		Supported:    []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER},
-		Unsupported:  mtcadapter.UnsupportedProfiles(linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER),
+		Version:      "draft-05/draft-06/draft-07",
+		Url:          "https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-07",
+		Supported:    []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER},
+		Unsupported:  mtcadapter.UnsupportedProfiles(linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER),
 		NumInstances: config.Config.Linter.Mtclint.NumGoroutines,
 		Interface:    func() linter.LinterInterface { return &MTCLint{} },
 	}).Register()
@@ -47,11 +47,15 @@ func (l *MTCLint) HandleRequest(_ context.Context, _ *linter.LinterInstance, req
 
 	var results []linter.LintingResult
 	draft06 := req.ProfileId == linter.MTC_DRAFT06_CA || req.ProfileId == linter.MTC_DRAFT06_SUBSCRIBER
+	draft07 := req.ProfileId == linter.MTC_DRAFT07_CA || req.ProfileId == linter.MTC_DRAFT07_SUBSCRIBER
 	cqrp := req.ProfileId == linter.CQRP_MTC_CA || req.ProfileId == linter.CQRP_MTC_SUBSCRIBER
 	if cqrp && req.MTCArtifact != nil && req.MTCArtifact.Revision == "06" {
 		draft06 = true
 	}
-	if req.MTCArtifact == nil || req.MTCArtifact.Kind != expected && !draft06 {
+	if cqrp && req.MTCArtifact != nil && req.MTCArtifact.Revision == "07" {
+		draft07 = true
+	}
+	if req.MTCArtifact == nil || req.MTCArtifact.Kind != expected && !draft06 && !draft07 {
 		results = append(results, linter.LintingResult{
 			Finding:  fmt.Sprintf("[%s §%s] Selected profile %q expects %s artifact; actual artifact kind is %s", profileMismatchSource, profileMismatchSection, profileName, artifactKindName(expected), actualArtifactKindName(req.MTCArtifact)),
 			Field:    "profile",
@@ -60,10 +64,12 @@ func (l *MTCLint) HandleRequest(_ context.Context, _ *linter.LinterInstance, req
 		})
 	}
 
-	if draft06 {
+	if draft07 {
+		results = append(results, mtcadapter.ConvertFindings(mtc.LintDraft07ForKind(req.MTCArtifact, expected))...)
+	} else if draft06 {
 		results = append(results, mtcadapter.ConvertFindings(mtc.LintDraft06ForKind(req.MTCArtifact, expected))...)
 	} else {
-		if req.MTCArtifact != nil && (req.MTCArtifact.Revision == "06" || req.MTCArtifact.RevisionError != nil) {
+		if req.MTCArtifact != nil && (req.MTCArtifact.Revision != "" && req.MTCArtifact.Revision != "05" || req.MTCArtifact.RevisionError != nil) {
 			results = append(results, linter.LintingResult{Code: "e_mtc_profile_revision_mismatch", Field: "profile", Finding: "[pkimetal profile dispatch] Selected profile requires unambiguous draft-05 identity", Severity: linter.SEVERITY_ERROR})
 		}
 		results = append(results, mtcadapter.ConvertFindings(mtc.LintDraft05ForKind(req.MTCArtifact, expected))...)
@@ -71,7 +77,7 @@ func (l *MTCLint) HandleRequest(_ context.Context, _ *linter.LinterInstance, req
 	if expected == mtc.ArtifactSubscriber {
 		results = append(results, mtcadapter.ConvertFindings(mtc.LintRFC5280SubscriberForKind(req.MTCArtifact, expected))...)
 	}
-	if req.ProfileId == linter.MTC_CA || req.ProfileId == linter.MTC_DRAFT06_CA {
+	if req.ProfileId == linter.MTC_CA || req.ProfileId == linter.MTC_DRAFT06_CA || req.ProfileId == linter.MTC_DRAFT07_CA {
 		results = append(results, mtcadapter.ConvertFindings(mtc.LintMTCTlogConditionalForKind(req.MTCArtifact, expected))...)
 	}
 	return results
@@ -89,6 +95,10 @@ func expectedKind(profile linter.ProfileId) (mtc.ArtifactKind, string, bool) {
 		return mtc.ArtifactCA, "mtc_draft06_ca", true
 	case linter.MTC_DRAFT06_SUBSCRIBER:
 		return mtc.ArtifactSubscriber, "mtc_draft06_subscriber", true
+	case linter.MTC_DRAFT07_CA:
+		return mtc.ArtifactCA, "mtc_draft07_ca", true
+	case linter.MTC_DRAFT07_SUBSCRIBER:
+		return mtc.ArtifactSubscriber, "mtc_draft07_subscriber", true
 	case linter.MTC_SUBSCRIBER:
 		return mtc.ArtifactSubscriber, "mtc_subscriber", true
 	case linter.CQRP_MTC_CA:

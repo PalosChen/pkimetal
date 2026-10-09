@@ -235,7 +235,7 @@ func TestDraft06EmptySignatureFraming(t *testing.T) {
 	if _, err := mtc.ParseProofForRevision(old, "06"); err == nil {
 		t.Fatal("draft06 parser accepted vector16")
 	}
-	for _, revision := range []string{"", "07"} {
+	for _, revision := range []string{"", "08"} {
 		if _, err := mtc.ParseProofForRevision(current, revision); err == nil {
 			t.Fatal("unsupported revision accepted")
 		}
@@ -294,7 +294,7 @@ func TestDraft06RevisionRecognition(t *testing.T) {
 }
 
 func TestDraft06NameAndExtensionExplicitRevision(t *testing.T) {
-	for _, revision := range []string{"05", "", "07"} {
+	for _, revision := range []string{"05", "", "08"} {
 		if _, err := mtc.ParseCAIDNameForRevision(draft06CA().Subject, revision); err == nil {
 			t.Fatalf("Name accepted for %q", revision)
 		}

@@ -240,6 +240,13 @@ var cqrp030Rules = []Rule{
 		return nil
 	}),
 	cqrp030Rule("e_cqrp_subscriber_standalone_cosignatures", "2.4.5", subscriberKinds, certificateInputKinds, func(a *Artifact) *Finding {
+		// MTC-07 §§6.2,6.4.4 permits GREASE on landmark-relative proofs.
+		// Without trusted subtree/cosigner context, signature count identifies
+		// neither certificate form nor a CA/Mirror quorum. Keep this legacy
+		// structural check only for revisions that require empty landmark lists.
+		if a.Revision == "07" {
+			return nil
+		}
 		if proofAvailable(a) && len(a.Proof.Signatures) != 0 && len(a.Proof.Signatures) < 2 {
 			return errorFinding("signatureValue.signatures", "standalone certificate has fewer than two cosignatures")
 		}

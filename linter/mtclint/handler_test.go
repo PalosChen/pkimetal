@@ -27,17 +27,17 @@ func TestRegistration(t *testing.T) {
 		t.Fatalf("mtclint registrations = %d, want 1", len(registered))
 	}
 	got := registered[0]
-	if got.Version != "draft-05/draft-06" {
-		t.Errorf("version = %q, want draft-05/draft-06", got.Version)
+	if got.Version != "draft-05/draft-06/draft-07" {
+		t.Errorf("version = %q, want draft-05/draft-06/draft-07", got.Version)
 	}
-	if got.Url != "https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06" {
+	if got.Url != "https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-07" {
 		t.Errorf("URL = %q", got.Url)
 	}
 	if got.NumInstances != 1 {
 		t.Errorf("instances = %d, want 1", got.NumInstances)
 	}
 
-	supported := []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER}
+	supported := []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER}
 	if !slices.Equal(got.Supported, supported) {
 		t.Errorf("supported = %#v, want %#v", got.Supported, supported)
 	}

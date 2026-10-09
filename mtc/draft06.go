@@ -6,28 +6,32 @@ const trustAnchor05Source = "draft-ietf-tls-trust-anchor-ids-05"
 var draft06Rules = buildDraftRules("06")
 
 func LintDraft06ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
+	return lintModernDraftForKind(artifact, expected, "06", draft06Source, draft06Rules)
+}
+
+func lintModernDraftForKind(artifact *Artifact, expected ArtifactKind, revision, source string, rules []Rule) []Finding {
 	if artifact == nil || expected != ArtifactCA && expected != ArtifactSubscriber {
 		return nil
 	}
 	local := *artifact
 	local.Kind = expected
 	if expected == ArtifactSubscriber && local.InputKind == InputCertificate {
-		local.Proof, local.ProofParseError = ParseProofForRevision(local.SignatureValue, "06")
+		local.Proof, local.ProofParseError = ParseProofForRevision(local.SignatureValue, revision)
 		if local.RevisionError != nil {
 			local.Proof = nil
 			local.ProofParseError = local.RevisionError
 		}
 	}
-	findings := runRules(&local, draft06Rules)
+	findings := runRules(&local, rules)
 	findings = append(findings, runRules(&local, []Rule{
-		{Code: "e_mtc_serial_index_outside_wire_domain", Source: draft06Source, Section: "5.2 and 6.2", Kinds: subscriberKinds, InputKinds: bothInputKinds, Evaluate: func(a *Artifact) *Finding {
+		{Code: "e_mtc_serial_index_outside_wire_domain", Source: source, Section: "5.2 and 6.2", Kinds: subscriberKinds, InputKinds: bothInputKinds, Evaluate: func(a *Artifact) *Finding {
 			_, index, ok := SplitSerial(a.SerialNumber)
 			if ok && index == maxUint48 {
 				return errorFinding("tbsCertificate.serialNumber", "Entry index exceeds the maximum issuance-log index 2^48-2")
 			}
 			return nil
 		}},
-		{Code: "e_mtc_entry_too_large", Source: draft06Source, Section: "5.2.1", Kinds: subscriberKinds, InputKinds: bothInputKinds, Evaluate: func(a *Artifact) *Finding {
+		{Code: "e_mtc_entry_too_large", Source: source, Section: "5.2.1", Kinds: subscriberKinds, InputKinds: bothInputKinds, Evaluate: func(a *Artifact) *Finding {
 			if size, ok := certificateLogEntrySize(a); ok && size > 65535 {
 				return errorFinding("tbsCertificate", "Reconstructed MTCLogEntry exceeds 65535 bytes")
 			}
@@ -35,10 +39,10 @@ func LintDraft06ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
 		}},
 	})...)
 	if artifact.Kind != expected {
-		findings = append(findings, Finding{Code: "e_mtc_profile_artifact_mismatch", Field: "profile", Message: "Selected draft-06 profile does not match artifact kind", Source: draft06Source, Section: "5.5 and 6.2", Severity: Error})
+		findings = append(findings, Finding{Code: "e_mtc_profile_artifact_mismatch", Field: "profile", Message: "Selected draft-" + revision + " profile does not match artifact kind", Source: source, Section: "5.5 and 6.2", Severity: Error})
 	}
-	if artifact.Revision != "06" || artifact.RevisionError != nil {
-		findings = append(findings, Finding{Code: "e_mtc_profile_revision_mismatch", Field: "profile", Message: "Selected draft-06 profile requires unambiguous draft-06 identity", Source: draft06Source, Section: "5.1 and 5.5", Severity: Error})
+	if artifact.Revision != revision || artifact.RevisionError != nil {
+		findings = append(findings, Finding{Code: "e_mtc_profile_revision_mismatch", Field: "profile", Message: "Selected draft-" + revision + " profile requires unambiguous draft-" + revision + " identity", Source: source, Section: "5.1 and 5.5", Severity: Error})
 	}
 	sortFindings(findings)
 	return findings

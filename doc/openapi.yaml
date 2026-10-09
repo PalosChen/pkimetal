@@ -3,8 +3,10 @@ info:
   title: pkimetal Experimental MTC Fork API
   description: >-
     API definition for a separately deployed experimental pkimetal fork with
-    MTC draft-06 (TAI-05), retained draft-05 (TAI-04), and official CQRP v0.3.0 linting.
-    Profiles 105-108 remain legacy/CQRP; 109-110 select draft-06 CA/subscriber.
+    MTC draft-07 (TAI-06), retained draft-06 (TAI-05) and draft-05 (TAI-04),
+    and official CQRP v0.3.0 linting. Profiles 105-110 retain their bindings;
+    111-112 select draft-07 CA/subscriber. Signature count cannot classify
+    07 GREASE proofs or prove CA/Mirror quorum without trusted context.
     Explicit CQRP profiles compose the unambiguous native artifact revision.
     External interoperability and complete Chrome operational compliance are not asserted.
     It does not describe capabilities of
@@ -30,7 +32,7 @@ paths:
       summary: Lint a Certificate
       description: >-
         Lints a complete X.509 Certificate or Precertificate. Experimental MTC
-        draft-05/draft-06 and CQRP v0.3.0 linting is selected with an explicit MTC
+        draft-05/draft-06/draft-07 and CQRP v0.3.0 linting is selected with an explicit MTC
         profile; autodetection never selects CQRP. CA and Subscriber profiles apply different rule sets:
         CA profiles inspect CA parameters and
         certificate-local mtc-tlog settings, while Subscriber profiles inspect
@@ -174,7 +176,8 @@ components:
       required: false
       description: >-
         Profile name. MTC values are mtc_ca, mtc_subscriber, cqrp_mtc_ca,
-        cqrp_mtc_subscriber, mtc_draft06_ca, and mtc_draft06_subscriber.
+        cqrp_mtc_subscriber, mtc_draft06_ca, mtc_draft06_subscriber,
+        mtc_draft07_ca, and mtc_draft07_subscriber.
         Omit or use autodetect for structural detection;
         CQRP profiles must be explicit. CA and Subscriber profiles apply
         different rule sets. Generic mtc_ca validates certificate-local
@@ -430,9 +433,10 @@ components:
         profile:
           type: string
           description: >-
-            Profile name. The six MTC values are mtc_ca, mtc_subscriber,
-            cqrp_mtc_ca, cqrp_mtc_subscriber, mtc_draft06_ca, and
-            mtc_draft06_subscriber. CA and Subscriber profiles
+            Profile name. The eight MTC values are mtc_ca, mtc_subscriber,
+            cqrp_mtc_ca, cqrp_mtc_subscriber, mtc_draft06_ca,
+            mtc_draft06_subscriber, mtc_draft07_ca, and
+            mtc_draft07_subscriber. CA and Subscriber profiles
             apply different rule sets; cqrp_mtc_ca requires the
             certificate-local mtc-tlog extension. Legacy names remain
             supported, so this property intentionally has no enum.

@@ -150,6 +150,21 @@ func ValidDraft06CATemplate() Template {
 	return tpl
 }
 
+func ValidDraft07SubscriberTemplate() Template {
+	tpl := ValidDraft06SubscriberTemplate()
+	tpl.Issuer = NameDER(NameAttribute{ID: asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 25, 3}, RawValue: der(13, ValidCAID())})
+	tpl.TBSSignature = Algorithm{OID: asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 67}}
+	tpl.OuterSignature = tpl.TBSSignature
+	return tpl
+}
+
+func ValidDraft07CATemplate() Template {
+	tpl := ValidDraft06CATemplate()
+	tpl.Subject = ValidDraft07SubscriberTemplate().Issuer
+	tpl.Extensions[0].ID = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 38}
+	return tpl
+}
+
 func Draft06CAExtensionDER(signatureAlgorithm Algorithm, minSerial, maxSerial *big.Int) []byte {
 	return der(0x30, algorithmIdentifier(signatureAlgorithm), integer(minSerial), integer(maxSerial))
 }
@@ -198,7 +213,7 @@ func ProofBytes(proof Proof) []byte {
 }
 
 func ProofBytesForRevision(proof Proof, revision string) []byte {
-	if revision != "05" && revision != "06" {
+	if revision != "05" && revision != "06" && revision != "07" {
 		panic("unsupported revision")
 	}
 	var extensions bytes.Buffer
@@ -222,7 +237,7 @@ func ProofBytesForRevision(proof Proof, revision string) []byte {
 	writeUint48(&encoded, proof.Start)
 	writeUint48(&encoded, proof.End)
 	writeVector16(&encoded, proof.InclusionProof)
-	if revision == "06" {
+	if revision != "05" {
 		n := signatures.Len()
 		if n > 1<<24-1 {
 			panic("signatures exceeds vector24")

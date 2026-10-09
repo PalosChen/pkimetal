@@ -1,6 +1,58 @@
 # MTC Linting Specification Baseline
 
-## Draft-06 Capability And Retained Legacy Profile
+## Draft-07 Capability And Retained Legacy Profiles
+
+Selected implementation target: `draft-ietf-plants-merkle-tree-certs-07`
+(2026-10-07), original-text SHA-256
+`adb411d371dc3474d7cd8c6fc3555bba3e4d6f7b1333cbaa7b0bf86c8925ca74`,
+with `draft-ietf-tls-trust-anchor-ids-06`, original-text SHA-256
+`3de3b75e7154fdde7000c367ab65f072cc3077cbcc0987527d168c02cbe0e502`.
+Sources: https://www.ietf.org/archive/id/draft-ietf-plants-merkle-tree-certs-07.txt
+and https://www.ietf.org/archive/id/draft-ietf-tls-trust-anchor-ids-06.txt.
+
+Explicit profiles 111/112 (`mtc_draft07_ca`, `mtc_draft07_subscriber`)
+select 07. Existing profiles 105–110 retain their IDs and revision bindings;
+CQRP 107/108 composes v0.3.0 with unambiguous 05/06/07 identity. URLs, key
+types and proof framing never select a revision. The formal proof OID can
+identify 07, but the shared experimental proof OID cannot distinguish 05/06.
+
+Normative delta and local coverage:
+
+- MTC-07 §§5.1,5.5,6.2,13.1: use only formal OIDs for 07: Name
+  `1.3.6.1.5.5.7.25.3` with RELATIVE-OID, critical SHA-256 CA extension
+  `1.3.6.1.5.5.7.1.38` with sigAlg/minSerial/maxSerial, and proof
+  `1.3.6.1.5.5.7.6.67` with absent parameters. Old OIDs remain bound to
+  original 05/06 parsing and profiles; conflicting identity fails autodetection.
+- MTC-07 §6.2 retains vector24 signatures, unique IDs and strict ordering;
+  GREASE MAY carry arbitrary bytes under unused IDs. The MUST NOT reuse
+  GREASE IDs needs operator history and is not certificate-local decidable.
+- MTC-07 §§6.4,6.4.4 permits GREASE on landmark-relative proofs. Signature
+  count cannot identify standalone/landmark form or prove CA/Mirror quorum.
+  CQRP §2.4.5's count finding remains a 05/06 structural check only; 07
+  needs trusted subtree, registry and signature context, absent in this API.
+  Unknown signatures never establish local verification or a quorum pass.
+- TAI-06 §4: 07 Name/cosigner IDs MUST NOT exceed 32 bytes; reject 33,
+  retain the 255-byte bounds of 05/06. The §6.2 uint8 vector is framing,
+  not an exception to the normative TAI bound (also MTC-07 §7.1).
+- TAI-06 §8 / MTC-07 §5.3.1: arbitrary-size components stay canonical
+  binary bytes; no fixed-width decoding, truncation or overflow. Signature
+  generation/verification and TLS negotiation are not implemented by this
+  local linter, so their failure/acceptance requirements are not certified.
+- MTC-07 §6.4.3 incorporates the pinned PR #337 row bound; this linter does
+  not consume landmark documents. Native runtime evidence belongs to the
+  parent baseline. §§13.2,14.2 registries/reference changes add no local
+  certificate rule and do not upgrade independent C2SP pins.
+
+Readers first: enable compatible 05/06/07 readers and lint before new 07
+representations/CRLs/writers. Preserve the same CAID, key, current Log/N,
+entry/hash/tile/checkpoint lineage and all historical certificate/CA/CRL bytes
+and URLs. Pause/drain and preserve accepted work's revision when activating
+new 07 issuance; no new log or sealed predecessor is implied. Rollback pauses
+new 07 admission while retaining upgraded readers/workers and committed bytes.
+This repository changes no schema, production dependency or service config.
+Deployment, HSM/registry state and external interoperability remain unverified.
+
+## Retained Draft-06 Capability (Historical Scope)
 
 The selected 06 baseline includes the §6.4.3 PR #337 erratum; use
 [the parent baseline](../SPECIFICATIONS.md#draft-06-pr-337-erratum-2026-10-06)
@@ -18,8 +70,7 @@ proof OID is not a discriminator. Legacy Name/extension/vector16 and TAI-04
 properties remain available; new artifacts use .47.3 RELATIVE-OID, .47.4
 three-field SHA-256 CA parameters, outer vector24 and TAI-05 patterns/properties.
 
-The selected service rollout keeps the same CA ID and key while sealing N1
-and explicitly activating an independent N2 origin/tree. Historical entries,
+The service rollout retains the same CA ID, key and current Log/N. Historical entries,
 hashes, tiles, certificates, checkpoint lineage and URLs are not rewritten.
 Canonical public Log URLs use `/<CAID>/<N>`; the certified prefix ends before N.
 Former version-prefixed aliases preserve historical reads only. Local linting
@@ -65,7 +116,7 @@ and unverified evidence respectively, not an all-green claim.
 
 
 Upstream snapshot for unchanged policies: 2026-08-19.
-MTC/TAI implementation capability updated: 2026-09-28; see limits below.
+MTC/TAI implementation capability updated: 2026-10-09; see limits above.
 
 The versions below are pinned. Upstream publication does not upgrade this
 repository automatically.
@@ -74,14 +125,14 @@ repository automatically.
 
 | Specification | Pinned baseline | Lint scope | Source |
 | --- | --- | --- | --- |
-| Merkle Tree Certificates | `draft-ietf-plants-merkle-tree-certs-06` + pinned PR #337 (§6.4.3) | MTC CA and subscriber syntax/profile rules | https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06 |
-| TLS Trust Anchor Identifiers | `draft-ietf-tls-trust-anchor-ids-05` | Relative OID and Trust Anchor ID syntax | https://datatracker.ietf.org/doc/html/draft-ietf-tls-trust-anchor-ids-05 |
+| Merkle Tree Certificates | `draft-ietf-plants-merkle-tree-certs-07`; retained 06 + PR #337 and 05 | Revision-bound MTC CA and subscriber syntax/profile rules | https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-07 |
+| TLS Trust Anchor Identifiers | `draft-ietf-tls-trust-anchor-ids-06`; retained 05/04 | Revision-bound relative OID and Trust Anchor ID syntax | https://datatracker.ietf.org/doc/html/draft-ietf-tls-trust-anchor-ids-06 |
 | Unsigned X.509 Certificates | RFC 9925 | Conditional unsigned CA-certificate rules | https://www.rfc-editor.org/rfc/rfc9925.html |
 | ML-DSA Algorithm Identifiers for PKIX | RFC 9881 | AlgorithmIdentifier and OID checks | https://www.rfc-editor.org/rfc/rfc9881.html |
 | PKIX Certificate and CRL Profile | RFC 5280 | Compatible X.509 certificate and CRL rules | https://www.rfc-editor.org/rfc/rfc5280.html |
 | TLS Baseline Requirements | CA/B Forum TLS BR `2.2.8`, effective 2026-06-16 | Compatible publicly trusted TLS certificate rules | https://cabforum.org/working-groups/server/baseline-requirements/documents/CA-Browser-Forum-TLS-BR-2.2.8.pdf |
 
-Selected MTC revision (`-05` legacy or `-06` new) overrides RFC 5280 only where explicit. Compatible RFC 5280 and TLS
+Selected MTC revision (`-05`, `-06` or `-07`) overrides RFC 5280 only where explicit. Compatible RFC 5280 and TLS
 BR rules remain applicable and may be delegated to registered general-purpose
 linters when they can safely parse the artifact.
 
@@ -105,7 +156,7 @@ identity are not locally decidable certificate lints.
 The `cqrp_mtc_ca` and `cqrp_mtc_subscriber` profiles are pinned to official
 `CQRP v0.3.0` (2026-08-14). CQRP is an explicit policy assertion, not an encoding
 that autodetection may infer. Both profiles retain their IDs and choose the
-native MTC-05/06 rules and proof parser from unambiguous artifact identity.
+native MTC-05/06/07 rules and proof parser from unambiguous artifact identity.
 The official original-source hashes and qualification boundaries are recorded
 below.
 
@@ -141,7 +192,7 @@ the implementation; obtaining or comparing the superseded v0.2.0 is not a gate.
 - Original Markdown SHA-256: `b084b7ad85985fbc31d7b2795204a05cc3a6d17ef4760c4aac0ca34ac8324393`.
 
 CQRP applies only to its explicit Chrome policy scope and overrides compatible
-MTC/RFC/BR requirements only where its text says so. Native MTC-05/06 and C2SP
+MTC/RFC/BR requirements only where its text says so. Retained MTC-05/06 and C2SP
 pins, CA keys and immutable historical artifacts remain unchanged. CQRP lint
 profiles explicitly compose the selected artifact revision with v0.3.0; proof
 framing or URLs never choose a revision. Subscriber N > 4 is rejected by the

@@ -3,6 +3,9 @@ package mtc
 import "encoding/asn1"
 
 var (
+	OIDCAIDDraft07                      = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 25, 3}
+	OIDMTCCertificationAuthorityDraft07 = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 38}
+	OIDMTCProofDraft07                  = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 67}
 	OIDCAIDDraft06                      = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 3}
 	OIDMTCCertificationAuthorityDraft06 = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 4}
 	OIDMTCProof                         = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 0}

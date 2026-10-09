@@ -1,5 +1,9 @@
 package mtc
 
+func validTrustAnchorIDBinaryForRevision(input []byte, revision string) bool {
+	return (revision != "07" || len(input) <= 32) && validTrustAnchorIDBinary(input)
+}
+
 func validTrustAnchorIDBinary(input []byte) bool {
 	if len(input) == 0 || len(input) > 255 {
 		return false

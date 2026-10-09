@@ -18,7 +18,7 @@ func ParseCAIDName(input []byte) ([]byte, error) {
 }
 
 func ParseCAIDNameForRevision(input []byte, revision string) ([]byte, error) {
-	if revision != "05" && revision != "06" {
+	if revision != "05" && revision != "06" && revision != "07" {
 		return nil, fmt.Errorf("unsupported MTC revision %q", revision)
 	}
 	root, err := parseExactDER(append([]byte(nil), input...))
@@ -62,6 +62,8 @@ func ParseCAIDNameForRevision(input []byte, revision string) ([]byte, error) {
 	expectedOID := OIDCAID
 	if revision == "06" {
 		expectedOID = OIDCAIDDraft06
+	} else if revision == "07" {
+		expectedOID = OIDCAIDDraft07
 	}
 	if !oid.Equal(expectedOID) {
 		return nil, errors.New("Name attribute is not id-rdna-trustAnchorID")
@@ -71,7 +73,7 @@ func ParseCAIDNameForRevision(input []byte, revision string) ([]byte, error) {
 		return nil, err
 	}
 	expectedTag := asn1.TagUTF8String
-	if revision == "06" {
+	if revision != "05" {
 		expectedTag = tagRelativeOID
 	}
 	if err := expectDER(caID, classUniversal, expectedTag, false, "CA-ID attribute value"); err != nil {
@@ -80,8 +82,8 @@ func ParseCAIDNameForRevision(input []byte, revision string) ([]byte, error) {
 	if err := noRemainingDER(attribute, "CA-ID attribute"); err != nil {
 		return nil, err
 	}
-	if revision == "06" {
-		if !validTrustAnchorIDBinary(caID.contents) {
+	if revision != "05" {
+		if !validTrustAnchorIDBinaryForRevision(caID.contents, revision) {
 			return nil, errors.New("invalid binary CA ID")
 		}
 		return append([]byte(nil), caID.contents...), nil
@@ -173,7 +175,7 @@ func ParseCertificationAuthorityExtension(input []byte) (*CertificationAuthority
 }
 
 func ParseCertificationAuthorityExtensionForRevision(input []byte, revision string) (*CertificationAuthority, error) {
-	if revision != "05" && revision != "06" {
+	if revision != "05" && revision != "06" && revision != "07" {
 		return nil, fmt.Errorf("unsupported MTC revision %q", revision)
 	}
 	root, err := parseExactDER(append([]byte(nil), input...))

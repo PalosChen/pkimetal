@@ -6,15 +6,19 @@ A REST API and web interface that integrates multiple linters to perform pre- an
 >
 > **Experimental MTC fork:** This fork adds native linting for
 > [Merkle Tree Certificates draft-05](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05)
-> and [draft-06](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06)
+> and retained [draft-06](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06),
+> plus [draft-07](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-07)
 > through `mtclint`, plus a separate CQRP v0.3.0 overlay through `cqrplint`.
 > Use the explicit `mtc_ca`, `mtc_subscriber`, `cqrp_mtc_ca`, or
 > `cqrp_mtc_subscriber` profile with `/lintcert` or `/linttbscert`.
 > Draft-06 uses `mtc_draft06_ca` and `mtc_draft06_subscriber`; legacy and CQRP
 > profile IDs remain unchanged. CQRP v0.3.0 composes the artifact's unambiguous
-> draft-05/draft-06 rules and matching proof parser; Chrome operational compliance
+> draft-05/draft-06/draft-07 rules and matching proof parser; Chrome operational compliance
 > is not established by certificate-local linting.
 > IDs 105-108 remain legacy/CQRP; new IDs 109-110 select draft-06 CA/subscriber.
+> IDs 111-112 select `mtc_draft07_ca` / `mtc_draft07_subscriber` with formal
+> OIDs and TAI-06's 32-byte ID bound. GREASE signatures cannot identify a
+> standalone/landmark form or establish a CA/Mirror quorum locally.
 > Both certificate and TBS inputs retain kind/input applicability boundaries.
 > Local linting does not verify registry, log/quorum state, HSM, deployment or
 > external TLS/RP interoperability; see [pinned baselines](SPECIFICATIONS.md).
@@ -91,7 +95,7 @@ Special-purpose linters:
 - [ctlint](https://github.com/crtsh/ctlint): Detects non-compliance with browser CT policies, in precertificates and embedded SCT lists.
 - [dwklint](https://github.com/CVE-2008-0166/dwklint): Detects Debian weak keys (CVE-2008-0166), as required by CABForum Ballot [SC-73](https://github.com/cabforum/servercert/pull/500/files#diff-e0ac1bd190515a4f2ec09139d395ef6a8c7e9e5b612957c1f5a2dea80c6a6cfeR1705).
 - [ftfy](https://github.com/rspeer/python-ftfy): Detects mojibake (character encoding mix-ups).
-- [mtclint](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06): Experimental native MTC draft-05/draft-06, revision-bound Trust Anchor ID binary syntax, conditional RFC 9925, and certificate-local pinned C2SP `mtc-tlog` linting.
+- [mtclint](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-07): Experimental native MTC draft-05/draft-06/draft-07, revision-bound Trust Anchor ID binary syntax, conditional RFC 9925, and certificate-local pinned C2SP `mtc-tlog` linting.
 - `cqrplint`: Experimental native CQRP v0.3.0 overlay linting for explicitly selected CQRP MTC profiles, including mandatory certificate-local `mtc-tlog` parameters for CQRP CAs.
 - [pwnedkeys](https://pwnedkeys.com): Detects compromised keys, where the private key was found "in the wild" and reported to the Pwnedkeys service. (NOTE: Since this linter currently involve calling an external API over the internet, it is **disabled by default**; to enable it via an environment variable, set `PKIMETAL_LINTER_PWNEDKEYS_NUMGOROUTINES=<n>` where `<n>` is an integer greater than zero).
 - [rocacheck](https://github.com/titanous/rocacheck): Detects ROCA weak keys (CVE-2017-15361), as required by CABForum Ballot [SC-73](https://github.com/cabforum/servercert/pull/500/files#diff-e0ac1bd190515a4f2ec09139d395ef6a8c7e9e5b612957c1f5a2dea80c6a6cfeR1706).
