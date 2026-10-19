@@ -17,6 +17,13 @@ https://raw.githubusercontent.com/cabforum/servercert/3574ae809e5f909b58ee4c26b7
 - SC104 (§§7.1.2.7.6–.7): AIA presence becomes SHOULD, not MUST. Native
   lint emits a warning for omission on/after the effective date; earlier
   issuance retains the error. Critical/malformed AIA remains an error.
+  For CQRP MTC subscribers, the ZLint adapter delegates only its obsolete
+  unconditional `e_sub_cert_aia_missing` rule to this native dated rule;
+  other compatible AIA checks and ordinary TLS registries are retained.
+  Its duplicate policy-presence/empty checks are likewise delegated only
+  for CQRP MTC subscribers to native CQRP v0.3.0 §2.4.3.2, including
+  missing, empty, malformed, critical, duplicate and reserved-OID checks.
+  This adapter adds no experimental-key or issuance exception.
 
 Every runtime C2SP reference below selects the existing
 `d0fe789122c75b903bfc1680b0b8b8dc570f0db3` baseline **plus only** the

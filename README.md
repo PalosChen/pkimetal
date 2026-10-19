@@ -114,6 +114,13 @@ Native BR checks follow the reviewed BR 2.3.1 baseline in `SPECIFICATIONS.md`.
 The stable AIA-missing finding code retains error severity for pre-2026-10-04
 issuance and reports a warning on/after that date (SC104); malformed/critical
 AIA remains an error.
+For CQRP MTC subscribers, ZLint's older unconditional
+`e_sub_cert_aia_missing` check is delegated to that native dated rule;
+other compatible AIA checks remain enabled. Ordinary TLS profiles retain
+their existing ZLint registry.
+The same CQRP registry delegates ZLint's duplicate policy presence/empty
+checks to native CQRP validation, which still rejects missing, empty,
+malformed, critical, duplicate or unapproved policy identifiers.
 
 [Docker containers](https://github.com/orgs/pkimetal/packages?repo_name=pkimetal) are pre-built automatically and published on the Github Container Repository (GHCR). Two different release cycles are provided:
 

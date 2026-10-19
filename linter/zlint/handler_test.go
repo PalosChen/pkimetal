@@ -8,12 +8,17 @@ import (
 	"crypto/x509/pkix"
 	"math/big"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/pkimetal/pkimetal/internal/mtctest"
 	"github.com/pkimetal/pkimetal/linter"
+	"github.com/pkimetal/pkimetal/mtc"
 	"github.com/zmap/zcrypto/x509"
+	zpkix "github.com/zmap/zcrypto/x509/pkix"
 	"github.com/zmap/zlint/v3/lint"
+	"github.com/zmap/zlint/v3/util"
 )
 
 func registeredZlint(t *testing.T) *linter.Linter {
@@ -95,6 +100,90 @@ func TestMTCRegistrySelection(t *testing.T) {
 	}
 	if registryForProfile(linter.RFC5280_ROOT) != notCabforumRegistry {
 		t.Fatal("legacy non-CABF registry selection changed")
+	}
+}
+
+func TestCQRPAIAPresenceDelegatesToNativeEffectiveDateRule(t *testing.T) {
+	cert := syntheticZcryptoCertificate(t)
+	for _, notBefore := range []time.Time{
+		time.Date(2026, 10, 3, 23, 59, 59, 0, time.UTC),
+		time.Date(2026, 10, 4, 0, 0, 0, 0, time.UTC),
+	} {
+		cert.NotBefore = notBefore
+		results := (&Zlint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{
+			Cert: cert, ProfileId: linter.CQRP_MTC_SUBSCRIBER,
+		})
+		if hasFinding(results, "e_sub_cert_aia_missing") {
+			t.Errorf("CQRP MTC at %s used the obsolete unconditional AIA presence rule", notBefore)
+		}
+		registry := cabforumTLSLeafRegistry
+		if !hasFinding(lintCert(&linter.LintingRequest{Cert: cert}, &registry), "e_sub_cert_aia_missing") {
+			t.Errorf("ordinary CABF TLS leaf at %s lost its existing AIA presence rule", notBefore)
+		}
+	}
+}
+
+func TestCQRPAIACriticalAndOtherCompatibleChecksRemainEnabled(t *testing.T) {
+	cert := syntheticZcryptoCertificate(t)
+	cert.ExtensionsMap[util.AiaOID.String()] = zpkix.Extension{Id: util.AiaOID, Critical: true}
+	results := (&Zlint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{
+		Cert: cert, ProfileId: linter.CQRP_MTC_SUBSCRIBER,
+	})
+	if !hasFinding(results, "e_ext_aia_marked_critical") {
+		t.Fatal("CQRP MTC lost the compatible RFC 5280 critical AIA rejection")
+	}
+	for _, name := range defaultRegistry.CertificateLints().Names() {
+		if name != "e_sub_cert_aia_missing" && strings.Contains(name, "aia") &&
+			cabforumTLSLeafRegistry.CertificateLints().ByName(name) != nil &&
+			cqrpMTCLeafRegistry.CertificateLints().ByName(name) == nil {
+			t.Errorf("compatible AIA check %s was excluded", name)
+		}
+	}
+}
+
+func TestCQRPPolicyPresenceDelegatesToNative(t *testing.T) {
+	cert := syntheticZcryptoCertificate(t)
+	results := (&Zlint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{
+		Cert: cert, ProfileId: linter.CQRP_MTC_SUBSCRIBER,
+	})
+	for _, code := range []string{"e_sub_cert_certificate_policies_missing", "e_sub_cert_cert_policy_empty"} {
+		if hasFinding(results, code) {
+			t.Errorf("CQRP MTC did not delegate %s to native policy validation", code)
+		}
+		registry := cabforumTLSLeafRegistry
+		if !hasFinding(lintCert(&linter.LintingRequest{Cert: cert}, &registry), code) {
+			t.Errorf("ordinary CABF TLS leaf lost %s", code)
+		}
+	}
+}
+
+func TestDelegatedCQRPPoliciesStillRejectOrdinaryInvalidPolicies(t *testing.T) {
+	for _, tc := range []struct {
+		name, code string
+		extension  *mtctest.Extension
+	}{
+		{"missing", "e_cqrp_subscriber_policies_missing", nil},
+		{"empty", "e_cqrp_subscriber_policy_identifier", &mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: []byte{0x30, 0x00}}},
+		{"malformed", "e_cqrp_subscriber_policy_identifier", &mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: []byte{0x30, 0x02, 0x30, 0x00}}},
+		{"critical", "e_cqrp_subscriber_policies_critical", &mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Critical: true, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := mtctest.ValidCQRPSubscriberTemplate()
+			mtctest.RemoveExtension(&tpl, mtctest.OIDCertificatePolicies)
+			if tc.extension != nil {
+				mtctest.ReplaceExtension(&tpl, *tc.extension)
+			}
+			artifact, err := mtc.Parse(mtctest.TBSCertificate(tpl), mtc.InputTBSCertificate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, finding := range mtc.LintCQRP030(artifact) {
+				if finding.Code == tc.code && finding.Severity == mtc.Error {
+					return
+				}
+			}
+			t.Fatalf("ordinary certificate lost native error %s", tc.code)
+		})
 	}
 }
 

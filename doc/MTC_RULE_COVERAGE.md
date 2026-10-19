@@ -5,6 +5,18 @@ immutable provenance and the SC101/SC100/SC104 delta in `SPECIFICATIONS.md`.
 SC104 changes `e_cabf_mtc_subscriber_aia_missing` to a warning for issuance
 on/after 2026-10-04; its stable code and pre-effective-date error remain.
 All criticality, access-method, URI and malformed-AIA errors remain enforced.
+The CQRP MTC subscriber ZLint registry excludes only the obsolete presence
+check `e_sub_cert_aia_missing`, whose unconditional error would conflict with
+SC104. The native rule owns the effective-date decision, including errors
+before 2026-10-04. Other compatible ZLint AIA checks and ordinary TLS
+registries remain unchanged.
+ZLint's `e_sub_cert_certificate_policies_missing` and
+`e_sub_cert_cert_policy_empty` are also delegated only for CQRP MTC
+subscribers to native CQRP §2.4.3.2 validation. Native rules still reject
+missing, empty, malformed, critical, duplicate and unapproved policies;
+no KEM exception is implemented in the linter. CA's separately validated
+experimental KEM branch retains its two existing exact native finding
+exceptions; ordinary issuance has none.
 
 This fork implements explicit draft-07 with retained draft-06/draft-05 experimental MTC linting.
 Profiles 105-108 retain their names and meanings; 109 is `mtc_draft06_ca` and

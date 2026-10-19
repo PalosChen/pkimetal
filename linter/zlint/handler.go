@@ -112,6 +112,14 @@ SubscriberCRL = false
 			"e_public_key_type_not_allowed",
 			"e_algorithm_identifier_improper_encoding",
 			"w_ct_sct_policy_count_unsatisfied",
+			// BR 2.3.1 SC104, sections 7.1.2.7.6-.7: native cqrplint
+			// enforces AIA presence at its 2026-10-04 effective-date boundary.
+			// ZLint's unconditional presence error predates that change.
+			"e_sub_cert_aia_missing",
+			// CQRP v0.3.0 section 2.4.3.2: native cqrplint validates
+			// policy presence, criticality and exactly one reserved identifier.
+			"e_sub_cert_certificate_policies_missing",
+			"e_sub_cert_cert_policy_empty",
 		},
 	}); err != nil {
 		logger.Logger.Fatal("Failed to configure filtered zlint registry for CQRP MTC subscriber certificates", zap.Error(err))
