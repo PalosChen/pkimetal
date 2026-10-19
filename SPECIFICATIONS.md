@@ -1,5 +1,40 @@
 # MTC Linting Specification Baseline
 
+## Reviewed standards update (2026-10-19)
+
+This delivery explicitly adopts TLS BR **2.3.1**, effective **2026-10-04**,
+after comparing 2.2.8 through 2.2.9/2.3.0 to 2.3.1. Immutable original:
+https://raw.githubusercontent.com/cabforum/servercert/3574ae809e5f909b58ee4c26b7bac4a3b9e78421/docs/BR.md
+(SHA-256 `ee4e4e95ba0f3fa1e11cb0dc01b2337aa26e88b8c7724c78f25e5743fc1e151e`).
+
+- SC101 (§§1.6.1, 3.2.2.4): select the original applied-for name as ADN;
+  remove `*.` only for allowed DNS methods; HTTP cannot validate wildcards.
+  Optional pruning and ADN CNAME substitution are not implemented.
+- SC100 (§4.2.2.2): primary DNSSEC errors MUST NOT authorize DCV/CAA,
+  even if the aggregate succeeds or stale matching output is returned.
+  Exactly one primary perspective is required. Resolver execution/root trust
+  configuration and retained operational evidence still need external verification.
+- SC104 (§§7.1.2.7.6–.7): AIA presence becomes SHOULD, not MUST. Native
+  lint emits a warning for omission on/after the effective date; earlier
+  issuance retains the error. Critical/malformed AIA remains an error.
+
+Every runtime C2SP reference below selects the existing
+`d0fe789122c75b903bfc1680b0b8b8dc570f0db3` baseline **plus only** the
+`tlog-tiles` Checkpoints correction in commit
+`4d53a2cea798a0230246ca5897c46586d52558d9` (PR #293, 2026-10-01):
+https://github.com/C2SP/C2SP/commit/4d53a2cea798a0230246ca5897c46586d52558d9 .
+It removes the Ed25519-only public Log signature mandate, not signature
+verification or configured CA/Mirror identity binding. No CA key, Log/N,
+entry/hash, wire format, schema or historical artifact changes result.
+No other edits at that commit, or later C2SP versions, are adopted.
+
+MTC-07/TAI-06, retained 05/06, CQRP v0.3.0 and the independent lint C2SP
+pin remain as specified below. Full BR/CQRP certification is not claimed.
+The user deferred quarterly ARI operations, a public live status page,
+formal disclosures/CP-CPS and exhaustive machine-readable certificate profiles.
+
+
+
 ## Draft-07 Capability And Retained Legacy Profiles
 
 Selected implementation target: `draft-ietf-plants-merkle-tree-certs-07`
@@ -49,7 +84,9 @@ entry/hash/tile/checkpoint lineage and all historical certificate/CA/CRL bytes
 and URLs. Pause/drain and preserve accepted work's revision when activating
 new 07 issuance; no new log or sealed predecessor is implied. Rollback pauses
 new 07 admission while retaining upgraded readers/workers and committed bytes.
-This repository changes no schema, production dependency or service config.
+No schema or production dependency version changes are required. Native service
+configuration now loads the project's direct `application.yml`; CA deployment
+must provide this private linter before admitting new issuance.
 Deployment, HSM/registry state and external interoperability remain unverified.
 
 ## Retained Draft-06 Capability (Historical Scope)
@@ -130,15 +167,15 @@ repository automatically.
 | Unsigned X.509 Certificates | RFC 9925 | Conditional unsigned CA-certificate rules | https://www.rfc-editor.org/rfc/rfc9925.html |
 | ML-DSA Algorithm Identifiers for PKIX | RFC 9881 | AlgorithmIdentifier and OID checks | https://www.rfc-editor.org/rfc/rfc9881.html |
 | PKIX Certificate and CRL Profile | RFC 5280 | Compatible X.509 certificate and CRL rules | https://www.rfc-editor.org/rfc/rfc5280.html |
-| TLS Baseline Requirements | CA/B Forum TLS BR `2.2.8`, effective 2026-06-16 | Compatible publicly trusted TLS certificate rules | https://cabforum.org/working-groups/server/baseline-requirements/documents/CA-Browser-Forum-TLS-BR-2.2.8.pdf |
+| TLS Baseline Requirements | CA/B Forum TLS BR `2.3.1`, effective 2026-10-04 | Compatible publicly trusted TLS certificate rules | https://cabforum.org/working-groups/server/baseline-requirements/documents/CA-Browser-Forum-TLS-BR-2.3.1.pdf |
 
 Selected MTC revision (`-05`, `-06` or `-07`) overrides RFC 5280 only where explicit. Compatible RFC 5280 and TLS
 BR rules remain applicable and may be delegated to registered general-purpose
 linters when they can safely parse the artifact.
 
-TLS BR `2.2.9` was current upstream at the verification date, but its normative
-delta has not been audited here. It is a pending upgrade, not the claimed lint
-baseline.
+TLS BR 2.3.1 is the selected native lint baseline after the reviewed delta
+above. Operational DNSSEC and ADN selection cannot be established by a
+certificate-local linter; these remain runtime/integration obligations.
 
 ## C2SP MTC-Tlog Overlay
 
@@ -209,14 +246,15 @@ operational tests (§§2.4.1–2.4.2), independent Usable/pre-freeze Frozen mirr
 (§2.4.5), availability/retention evidence (§§2.5, 3.2), active-key roles/HSM/
 ceremonies/key schedules (§2.6), and Chrome registry/operator obligations require
 external qualification. §2.3.1 delegates to latest BR; the independently pinned
-BR 2.2.8 has not been silently upgraded or certified as satisfying that mandate.
+BR 2.3.1 is explicitly selected and assessed above; deployment and operational
+qualification remain necessary before claiming that mandate is fully satisfied.
 
 Subscriber-key admission now enforces CQRP v0.3.0 §2.4.3.2 in both CA and
 TC: pure ML-DSA-44/65/87 with parameters absent, exact RFC 9881 §4 key sizes
-and byte-aligned BIT STRINGs, or BR 2.2.8 §§6.1.5–6.1.6/7.1.3.1 RSA/NIST EC
+and byte-aligned BIT STRINGs, or BR 2.3.1 §§6.1.5–6.1.6/7.1.3.1 RSA/NIST EC
 keys with validated parameters and points. Ed25519 subscriber keys are rejected
 for both CSR and PoP; Ed25519 ACME account authentication remains supported.
-CA and TC enforce BR 2.2.8 §6.1.6's RSA exponent range, small-factor and
+CA and TC enforce BR 2.3.1 §6.1.6's RSA exponent range, small-factor and
 prime-power SHOULD checks, plus Fermat/ROCA rejection (§6.1.1.3). Built-in
 Debian SHA-256 modulus/X-coordinate data is fixed to CAB Forum-recommended
 dwk_blocklists commit `38b221be821e79475bd07063b16d841a7bf4b3cc`, derived from

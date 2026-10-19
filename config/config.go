@@ -168,12 +168,10 @@ func init() {
 }
 
 func initViper() error {
-	// Imports config file values from least to most specific.
-	viper.SetConfigName("config.yaml")
+	// Deployment policy is read directly from one application.yml file.
+	viper.SetConfigName("application")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("/config")  // /config/config.yaml
-	viper.AddConfigPath("./config") // ./config/config.yaml
-	viper.AddConfigPath(".")        // ./config.yaml
+	viper.AddConfigPath(".")
 
 	// Setup Viper to also look at environment variables.
 	viper.SetEnvPrefix(ApplicationNamespace)
@@ -229,7 +227,11 @@ func initViper() error {
 	viper.SetDefault("logging.samplingThereafter", math.MaxInt) // See https://pkg.go.dev/go.uber.org/zap/zapcore#NewSamplerWithOptions for more information.
 
 	// Render results to Config Struct.
-	_ = viper.ReadInConfig() // Ignore errors, because we also support reading config from environment variables.
+	if err := viper.ReadInConfig(); err != nil {
+		if _, missing := err.(viper.ConfigFileNotFoundError); !missing {
+			return fmt.Errorf("read application.yml: %w", err)
+		}
+	}
 	return viper.Unmarshal(&Config)
 }
 

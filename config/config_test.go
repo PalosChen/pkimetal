@@ -1,9 +1,35 @@
 package config
 
 import (
+	"os"
 	"reflect"
 	"testing"
+
+	"github.com/spf13/viper"
 )
+
+func TestApplicationConfigurationIsLoadedAndMalformedInputFails(t *testing.T) {
+	original := Config
+	t.Cleanup(func() { Config = original; viper.Reset() })
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile("application.yml", []byte("server:\n  webserverPort: 19876\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	viper.Reset()
+	if err := initViper(); err != nil {
+		t.Fatal(err)
+	}
+	if Config.Server.WebserverPort != 19876 {
+		t.Fatalf("application.yml ignored: port = %d", Config.Server.WebserverPort)
+	}
+	if err := os.WriteFile("application.yml", []byte("server: [unterminated\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	viper.Reset()
+	if err := initViper(); err == nil {
+		t.Fatal("malformed application.yml must fail instead of using defaults")
+	}
+}
 
 func TestNativeMTCPolicyLinterDefaults(t *testing.T) {
 	if Config.Linter.Mtclint.NumGoroutines != 1 {

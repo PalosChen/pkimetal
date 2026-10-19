@@ -48,13 +48,11 @@ These endpoints are **disabled by default**. Set `server.enableDebugEndpoints` t
 
 ## Configuration
 
-pkimetal uses [Viper](https://github.com/spf13/viper) to read configuration settings from environment variables and/or a `config.yaml` file.
-
-Configuration files are searched for in the following locations (from least to most specific):
-
-1. `/config/config.yaml`
-2. `./config/config.yaml`
-3. `./config.yaml`
+This fork reads one `application.yml` in its working directory (`/app` in
+the image). A malformed file stops startup. Mount the selected environment's
+file read-only at `/app/application.yml`; missing configuration retains the
+documented defaults. Viper's upstream environment overrides remain supported,
+but project deployments keep application policy directly in `application.yml`.
 
 For a full list of configuration options and their default values, please consult the [config.go](/config/config.go) source code.
 
@@ -66,9 +64,9 @@ Here is an example of passing a pkimetal configuration parameter in an environme
 docker run -p 8080:8080 -e PKIMETAL_LINTER_FTFY_NUMPROCESSES=0 -it pkimetal
 ```
 
-### Example `config.yaml`
+### Example `application.yml`
 
-Here is an example `config.yaml` file that demonstrates some of the highlights:
+Here is an example `application.yml` file that demonstrates some of the highlights:
 
 ```yaml
 server:

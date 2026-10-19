@@ -102,6 +102,19 @@ Special-purpose linters:
 
 ## Docker containers
 
+For this project's private lint service, build and push on the local build
+machine with `make push_test` or `make push_uat` (default Linux/amd64).
+These publish `harbor2.trustasia.cn/mtc/pkimetal:test` / `:uat`; override
+`REGISTRY` or `PLATFORM` when required. The CA deployment adds the private
+service and mounts its direct `application.yml`. Build this image before a
+CA release: new issuance fails closed if native MTC/CQRP lint is unavailable,
+old, incomplete or reports an error. No public service ports are required.
+
+Native BR checks follow the reviewed BR 2.3.1 baseline in `SPECIFICATIONS.md`.
+The stable AIA-missing finding code retains error severity for pre-2026-10-04
+issuance and reports a warning on/after that date (SC104); malformed/critical
+AIA remains an error.
+
 [Docker containers](https://github.com/orgs/pkimetal/packages?repo_name=pkimetal) are pre-built automatically and published on the Github Container Repository (GHCR). Two different release cycles are provided:
 
 The upstream GHCR images described below do not expose these fork-only MTC/CQRP features. A separately built image from this fork is required for MTC or CQRP linting.

@@ -1,5 +1,11 @@
 # MTC and CQRP rule coverage
 
+The native compatible BR baseline is TLS BR 2.3.1 (2026-10-04), with
+immutable provenance and the SC101/SC100/SC104 delta in `SPECIFICATIONS.md`.
+SC104 changes `e_cabf_mtc_subscriber_aia_missing` to a warning for issuance
+on/after 2026-10-04; its stable code and pre-effective-date error remain.
+All criticality, access-method, URI and malformed-AIA errors remain enforced.
+
 This fork implements explicit draft-07 with retained draft-06/draft-05 experimental MTC linting.
 Profiles 105-108 retain their names and meanings; 109 is `mtc_draft06_ca` and
 110 is `mtc_draft06_subscriber`; 111/112 are `mtc_draft07_ca` and

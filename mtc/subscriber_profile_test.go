@@ -761,6 +761,30 @@ func TestCABFTLSSubscriberCriticalSANErrorSeverity(t *testing.T) {
 	}
 }
 
+func TestCABFTLSSubscriberAIAPresenceAcrossSC104(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		when     time.Time
+		severity Severity
+	}{
+		{"before", time.Date(2026, 10, 3, 23, 59, 59, 0, time.UTC), Error},
+		{"effective", time.Date(2026, 10, 4, 0, 0, 0, 0, time.UTC), Warning},
+		{"after", time.Date(2026, 10, 19, 0, 0, 0, 0, time.UTC), Warning},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := mtctest.ValidCQRPSubscriberTemplate()
+			tpl.NotBefore = tc.when
+			tpl.NotAfter = tc.when.Add(24 * time.Hour)
+			mtctest.RemoveExtension(&tpl, mtctest.OIDAuthorityInfoAccess)
+			findings := LintCABFTLSSubscriberForKind(parseArtifact(t, mtctest.Certificate(tpl), InputCertificate), ArtifactSubscriber)
+			assertFindingCodes(t, findings, "e_cabf_mtc_subscriber_aia_missing")
+			if findings[0].Severity != tc.severity {
+				t.Fatalf("SC104 AIA severity = %v, want %v", findings[0].Severity, tc.severity)
+			}
+		})
+	}
+}
+
 func replaceSAN(value []byte) func(*mtctest.Template) {
 	return func(tpl *mtctest.Template) {
 		mtctest.ReplaceExtension(tpl, mtctest.Extension{ID: mtctest.OIDSubjectAltName, Critical: true, Value: value})

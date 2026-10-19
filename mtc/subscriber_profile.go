@@ -165,6 +165,11 @@ var cabfTLSSubscriberRules = []Rule{
 	}),
 	subscriberProfileRule("e_cabf_mtc_subscriber_aia_missing", cabfTLSBRSource, "7.1.2.7.6 and 7.1.2.7.7", func(a *Artifact) *Finding {
 		if countExtensions(a, oidAuthorityInfoAccess) == 0 {
+			// SC104 (BR 2.3.1): AIA presence became SHOULD on 2026-10-04.
+			// Keep the stable finding code and historical issuance requirements.
+			if !a.NotBefore.Before(time.Date(2026, 10, 4, 0, 0, 0, 0, time.UTC)) {
+				return warningFinding("tbsCertificate.extensions.authorityInformationAccess", "TLS subscriber certificate omits the recommended authority information access extension")
+			}
 			return errorFinding("tbsCertificate.extensions.authorityInformationAccess", "TLS subscriber certificate has no authority information access extension")
 		}
 		return nil
