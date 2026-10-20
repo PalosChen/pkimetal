@@ -102,6 +102,11 @@ Special-purpose linters:
 
 ## Docker containers
 
+The Docker build stage uses `https://goproxy.cn,direct` for Go module downloads
+to avoid intermittent TLS timeouts to `proxy.golang.org` from the build network.
+Pinned module versions and Go checksum verification are preserved. This setting
+applies only to the build stage, not the runtime image.
+
 For this project's private lint service, build and push on the local build
 machine with `make push_test` or `make push_uat` (default Linux/amd64).
 These publish `harbor2.trustasia.cn/mtc/pkimetal:test` / `:uat`; override

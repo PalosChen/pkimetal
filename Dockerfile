@@ -22,6 +22,8 @@ ENV PATH="/root/.local/bin:/root/.cargo/bin:${PATH}"
 
 # Build dependencies.
 WORKDIR /app
+# Use the reachable module proxy in the build container; retain Go checksum verification.
+ENV GOPROXY=https://goproxy.cn,direct
 COPY . .
 ARG gomodfile=go.mod
 RUN \
