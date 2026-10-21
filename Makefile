@@ -1,3 +1,21 @@
+REGISTRY ?= harbor2.trustasia.cn
+.DEFAULT_GOAL := pkimetal
+TAG ?= test
+PLATFORM ?= linux/amd64
+
+.PHONY: image push push_test push_uat
+image:
+	docker buildx build --platform $(PLATFORM) --load -t $(REGISTRY)/mtc/pkimetal:$(TAG) .
+
+push:
+	docker buildx build --platform $(PLATFORM) --push -t $(REGISTRY)/mtc/pkimetal:$(TAG) .
+
+push_test:
+	$(MAKE) push TAG=test
+
+push_uat:
+	$(MAKE) push TAG=uat
+
 pkimetal: clean
 	CURDIR=$(shell pwd)
 	cd $(shell go list -m -f {{.Dir}} github.com/kroeckx/x509lint); \

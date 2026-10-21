@@ -2,6 +2,35 @@
 
 A REST API and web interface that integrates multiple linters to perform pre- and post-issuance linting of PKI artifacts (Certificates, Precertificates, CRLs, and OCSP Responses).
 
+> **Deployment scope: experimental fork only.**
+>
+> **Experimental MTC fork:** This fork adds native linting for
+> [Merkle Tree Certificates draft-05](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05)
+> and retained [draft-06](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-06),
+> plus [draft-07](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-07)
+> through `mtclint`, plus a separate CQRP v0.3.0 overlay through `cqrplint`.
+> Use the explicit `mtc_ca`, `mtc_subscriber`, `cqrp_mtc_ca`, or
+> `cqrp_mtc_subscriber` profile with `/lintcert` or `/linttbscert`.
+> Draft-06 uses `mtc_draft06_ca` and `mtc_draft06_subscriber`; legacy and CQRP
+> profile IDs remain unchanged. CQRP v0.3.0 composes the artifact's unambiguous
+> draft-05/draft-06/draft-07 rules and matching proof parser; Chrome operational compliance
+> is not established by certificate-local linting.
+> IDs 105-108 remain legacy/CQRP; new IDs 109-110 select draft-06 CA/subscriber.
+> IDs 111-112 select `mtc_draft07_ca` / `mtc_draft07_subscriber` with formal
+> OIDs and TAI-06's 32-byte ID bound. GREASE signatures cannot identify a
+> standalone/landmark form or establish a CA/Mirror quorum locally.
+> Both certificate and TBS inputs retain kind/input applicability boundaries.
+> Local linting does not verify registry, log/quorum state, HSM, deployment or
+> external TLS/RP interoperability; see [pinned baselines](SPECIFICATIONS.md).
+> See [MTC and CQRP rule coverage](doc/MTC_RULE_COVERAGE.md) for exact scope and
+> offline limitations. CA and Subscriber profiles apply different rules:
+> generic `mtc_ca` validates `mtc-tlog` only when its extension is present,
+> while `cqrp_mtc_ca` requires the `mtc-tlog` extension; Subscriber profiles
+> inspect subscriber structure and complete-certificate proof fields instead.
+> Upstream container images and the public services at
+> `pkimet.al` and `dev.pkimet.al` do not expose these fork-only MTC/CQRP features;
+> build and deploy this fork separately to use them.
+
 At a glance:
 
 - [Features](#features)
@@ -66,12 +95,41 @@ Special-purpose linters:
 - [ctlint](https://github.com/crtsh/ctlint): Detects non-compliance with browser CT policies, in precertificates and embedded SCT lists.
 - [dwklint](https://github.com/CVE-2008-0166/dwklint): Detects Debian weak keys (CVE-2008-0166), as required by CABForum Ballot [SC-73](https://github.com/cabforum/servercert/pull/500/files#diff-e0ac1bd190515a4f2ec09139d395ef6a8c7e9e5b612957c1f5a2dea80c6a6cfeR1705).
 - [ftfy](https://github.com/rspeer/python-ftfy): Detects mojibake (character encoding mix-ups).
+- [mtclint](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-07): Experimental native MTC draft-05/draft-06/draft-07, revision-bound Trust Anchor ID binary syntax, conditional RFC 9925, and certificate-local pinned C2SP `mtc-tlog` linting.
+- `cqrplint`: Experimental native CQRP v0.3.0 overlay linting for explicitly selected CQRP MTC profiles, including mandatory certificate-local `mtc-tlog` parameters for CQRP CAs.
 - [pwnedkeys](https://pwnedkeys.com): Detects compromised keys, where the private key was found "in the wild" and reported to the Pwnedkeys service. (NOTE: Since this linter currently involve calling an external API over the internet, it is **disabled by default**; to enable it via an environment variable, set `PKIMETAL_LINTER_PWNEDKEYS_NUMGOROUTINES=<n>` where `<n>` is an integer greater than zero).
 - [rocacheck](https://github.com/titanous/rocacheck): Detects ROCA weak keys (CVE-2017-15361), as required by CABForum Ballot [SC-73](https://github.com/cabforum/servercert/pull/500/files#diff-e0ac1bd190515a4f2ec09139d395ef6a8c7e9e5b612957c1f5a2dea80c6a6cfeR1706).
 
 ## Docker containers
 
+The Docker build stage uses `https://goproxy.cn,direct` for Go module downloads
+to avoid intermittent TLS timeouts to `proxy.golang.org` from the build network.
+Pinned module versions and Go checksum verification are preserved. This setting
+applies only to the build stage, not the runtime image.
+
+For this project's private lint service, build and push on the local build
+machine with `make push_test` or `make push_uat` (default Linux/amd64).
+These publish `harbor2.trustasia.cn/mtc/pkimetal:test` / `:uat`; override
+`REGISTRY` or `PLATFORM` when required. The CA deployment adds the private
+service and mounts its direct `application.yml`. Build this image before a
+CA release: new issuance fails closed if native MTC/CQRP lint is unavailable,
+old, incomplete or reports an error. No public service ports are required.
+
+Native BR checks follow the reviewed BR 2.3.1 baseline in `SPECIFICATIONS.md`.
+The stable AIA-missing finding code retains error severity for pre-2026-10-04
+issuance and reports a warning on/after that date (SC104); malformed/critical
+AIA remains an error.
+For CQRP MTC subscribers, ZLint's older unconditional
+`e_sub_cert_aia_missing` check is delegated to that native dated rule;
+other compatible AIA checks remain enabled. Ordinary TLS profiles retain
+their existing ZLint registry.
+The same CQRP registry delegates ZLint's duplicate policy presence/empty
+checks to native CQRP validation, which still rejects missing, empty,
+malformed, critical, duplicate or unapproved policy identifiers.
+
 [Docker containers](https://github.com/orgs/pkimetal/packages?repo_name=pkimetal) are pre-built automatically and published on the Github Container Repository (GHCR). Two different release cycles are provided:
+
+The upstream GHCR images described below do not expose these fork-only MTC/CQRP features. A separately built image from this fork is required for MTC or CQRP linting.
 
 - [Stable](https://github.com/pkimetal/pkimetal/pkgs/container/pkimetal) releases: These have a "vX.X.X" tag on GHCR and are automatically built and published whenever a corresponding [pkimetal release](https://github.com/pkimetal/pkimetal/releases) is created. The most recent Stable release also receives the "latest" tag. Since Stable releases track versioned releases of each linter project (wherever possible), **only Stable releases are recommended for production usage**.
 - [Development](https://github.com/pkimetal/pkimetal/pkgs/container/pkimetal-dev) releases: These have a "YYYYMMDDHHMMSS" tag on GHCR and are automatically built and published whenever a corresponding [commit](https://github.com/pkimetal/pkimetal/commits/main/) is pushed to the "main" branch. Since Development releases also track the latest commits to the "main"/"master" branch of each linter project, they are NOT RECOMMENDED for production usage.
@@ -82,6 +140,8 @@ Sectigo provides public instances of pkimetal that correspond to the two release
 
 - Stable: https://pkimet.al/
 - Development: https://dev.pkimet.al/
+
+These upstream public instances do not expose these fork-only MTC/CQRP features. They must not be used as MTC or CQRP endpoints for this fork.
 
 These public instances are provided as-is, on a best effort basis. They are NOT RECOMMENDED for production usage by CAs, because (due to Ballot SC-75) they may be seen as Delegated Third Parties. Your own deployment of the [Docker container](#docker-containers) for the latest Stable release is the appropriate way to deploy pkimetal in a production CA environment.
 

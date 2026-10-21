@@ -1,0 +1,655 @@
+package mtctest
+
+import (
+	"bytes"
+	"encoding/asn1"
+	"encoding/pem"
+	"fmt"
+	"math/big"
+	"os"
+	"path/filepath"
+	"time"
+)
+
+var (
+	OIDMTCProof               = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 0}
+	OIDCAID                   = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 1}
+	OIDMTC_CA                 = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 2}
+	OIDMTCTlogPrefixURL       = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 64829, 2, 1}
+	OIDMLDSA44                = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 17}
+	OIDMLDSA65                = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 18}
+	OIDMLDSA87                = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 19}
+	OIDHashMLDSA44            = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 32}
+	OIDHashMLDSA65            = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 33}
+	OIDHashMLDSA87            = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 34}
+	OIDRSAEncryption          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
+	OIDECPublicKey            = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
+	OIDDSAPublicKey           = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 1}
+	OIDEd25519                = asn1.ObjectIdentifier{1, 3, 101, 112}
+	OIDSHA256                 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
+	OIDUnsigned               = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 36}
+	OIDCommonName             = asn1.ObjectIdentifier{2, 5, 4, 3}
+	OIDSerialNumber           = asn1.ObjectIdentifier{2, 5, 4, 5}
+	OIDStreetAddress          = asn1.ObjectIdentifier{2, 5, 4, 9}
+	OIDPostalCode             = asn1.ObjectIdentifier{2, 5, 4, 17}
+	OIDBusinessCategory       = asn1.ObjectIdentifier{2, 5, 4, 15}
+	OIDOrganizationIdentifier = asn1.ObjectIdentifier{2, 5, 4, 97}
+	OIDDomainComponent        = asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 25}
+	OIDJurisdictionLocality   = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 60, 2, 1, 1}
+	OIDJurisdictionState      = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 60, 2, 1, 2}
+	OIDJurisdictionCountry    = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 60, 2, 1, 3}
+	OIDKeyUsage               = asn1.ObjectIdentifier{2, 5, 29, 15}
+	OIDSubjectKeyID           = asn1.ObjectIdentifier{2, 5, 29, 14}
+	OIDBasicConstraints       = asn1.ObjectIdentifier{2, 5, 29, 19}
+	OIDNameConstraints        = asn1.ObjectIdentifier{2, 5, 29, 30}
+	OIDCRLDistributionPoints  = asn1.ObjectIdentifier{2, 5, 29, 31}
+	OIDAuthorityKeyID         = asn1.ObjectIdentifier{2, 5, 29, 35}
+	OIDAuthorityInfoAccess    = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 1}
+	OIDAccessMethodOCSP       = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 1}
+	OIDAccessMethodIssuers    = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 2}
+	OIDIssuerAltName          = asn1.ObjectIdentifier{2, 5, 29, 18}
+	OIDSubjectAltName         = asn1.ObjectIdentifier{2, 5, 29, 17}
+	OIDCertificatePolicies    = asn1.ObjectIdentifier{2, 5, 29, 32}
+	OIDExtendedKeyUsage       = asn1.ObjectIdentifier{2, 5, 29, 37}
+	OIDServerAuth             = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1}
+	OIDSCTList                = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 2}
+	OIDOrganizationName       = asn1.ObjectIdentifier{2, 5, 4, 10}
+	OIDOrganizationalUnitName = asn1.ObjectIdentifier{2, 5, 4, 11}
+	OIDCountryName            = asn1.ObjectIdentifier{2, 5, 4, 6}
+	OIDLocalityName           = asn1.ObjectIdentifier{2, 5, 4, 7}
+	OIDStateOrProvinceName    = asn1.ObjectIdentifier{2, 5, 4, 8}
+	OIDSurname                = asn1.ObjectIdentifier{2, 5, 4, 4}
+	OIDGivenName              = asn1.ObjectIdentifier{2, 5, 4, 42}
+	OIDPolicyDV               = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 1}
+	OIDPolicyOV               = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 2}
+	OIDPolicyIV               = asn1.ObjectIdentifier{2, 23, 140, 1, 2, 3}
+	OIDPolicyQualifierCPS     = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 2, 1}
+)
+
+type Algorithm struct {
+	OID               asn1.ObjectIdentifier
+	ParametersPresent bool
+	Parameters        []byte
+}
+
+type Extension struct {
+	ID       asn1.ObjectIdentifier
+	Critical bool
+	Value    []byte
+}
+
+type ProofExtension struct {
+	Type uint16
+	Data []byte
+}
+
+type ProofSignature struct {
+	CosignerID []byte
+	Signature  []byte
+}
+
+type Proof struct {
+	Extensions     []ProofExtension
+	Start          uint64
+	End            uint64
+	InclusionProof []byte
+	Signatures     []ProofSignature
+}
+
+type Template struct {
+	Serial                 *big.Int
+	TBSSignature           Algorithm
+	OuterSignature         Algorithm
+	Issuer                 []byte
+	Subject                []byte
+	NotBefore              time.Time
+	NotAfter               time.Time
+	SPKIAlgorithm          Algorithm
+	SubjectPublicKey       []byte
+	SubjectPublicKeyUnused int
+	IssuerUniqueID         []byte
+	IssuerUniqueIDUnused   int
+	SubjectUniqueID        []byte
+	SubjectUniqueIDUnused  int
+	Extensions             []Extension
+	Signature              []byte
+	SignatureUnused        int
+}
+
+func ValidSubscriberTemplate() Template {
+	return Template{
+		Serial:           new(big.Int).SetUint64((1 << 48) | 7),
+		TBSSignature:     Algorithm{OID: OIDMTCProof},
+		OuterSignature:   Algorithm{OID: OIDMTCProof},
+		Issuer:           ValidCAIDNameDER(),
+		Subject:          der(0x30, nil),
+		NotBefore:        time.Date(2026, 7, 1, 8, 0, 0, 0, time.UTC),
+		NotAfter:         time.Date(2026, 7, 8, 8, 0, 0, 0, time.UTC),
+		SPKIAlgorithm:    Algorithm{OID: OIDMLDSA44},
+		SubjectPublicKey: bytes.Repeat([]byte{0x5a}, 1312),
+		Extensions: []Extension{
+			{ID: OIDBasicConstraints, Critical: true, Value: der(0x30, nil)},
+			{ID: OIDSubjectAltName, Critical: true, Value: GeneralNamesDER(DNSNameGeneralNameDER("subscriber.example.com"))},
+			{ID: OIDAuthorityKeyID, Value: AuthorityKeyIdentifierDER([]byte{0x81, 0xfd, 0x59, 0x01})},
+		},
+		Signature: ProofBytes(ValidProof()),
+	}
+}
+
+func ValidDraft06SubscriberTemplate() Template {
+	tpl := ValidSubscriberTemplate()
+	tpl.Issuer = NameDER(NameAttribute{ID: asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 3}, RawValue: der(13, ValidCAID())})
+	tpl.Signature = ProofBytesForRevision(ValidProof(), "06")
+	return tpl
+}
+
+func ValidDraft06CATemplate() Template {
+	tpl := ValidCATemplate()
+	tpl.Subject = ValidDraft06SubscriberTemplate().Issuer
+	tpl.Extensions[0] = Extension{ID: asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 4}, Critical: true, Value: Draft06CAExtensionDER(Algorithm{OID: OIDMLDSA65}, new(big.Int).Lsh(big.NewInt(1), 48), new(big.Int).SetUint64(1<<48|99))}
+	return tpl
+}
+
+func ValidDraft07SubscriberTemplate() Template {
+	tpl := ValidDraft06SubscriberTemplate()
+	tpl.Issuer = NameDER(NameAttribute{ID: asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 25, 3}, RawValue: der(13, ValidCAID())})
+	tpl.TBSSignature = Algorithm{OID: asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 67}}
+	tpl.OuterSignature = tpl.TBSSignature
+	return tpl
+}
+
+func ValidDraft07CATemplate() Template {
+	tpl := ValidDraft06CATemplate()
+	tpl.Subject = ValidDraft07SubscriberTemplate().Issuer
+	tpl.Extensions[0].ID = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 38}
+	return tpl
+}
+
+func Draft06CAExtensionDER(signatureAlgorithm Algorithm, minSerial, maxSerial *big.Int) []byte {
+	return der(0x30, algorithmIdentifier(signatureAlgorithm), integer(minSerial), integer(maxSerial))
+}
+
+func ValidCQRPSubscriberTemplate() Template {
+	tpl := ValidSubscriberTemplate()
+	tpl.Extensions = append(tpl.Extensions,
+		Extension{ID: OIDKeyUsage, Critical: true, Value: KeyUsageBitsDER(0x8000)},
+		Extension{ID: OIDCertificatePolicies, Value: CertificatePoliciesDER(OIDPolicyDV)},
+		Extension{ID: OIDExtendedKeyUsage, Value: ExtendedKeyUsageDER(OIDServerAuth)},
+		Extension{ID: OIDAuthorityInfoAccess, Value: AuthorityInformationAccessDER(
+			AccessDescriptionDER(OIDAccessMethodOCSP, "http://ocsp.example.com"),
+			AccessDescriptionDER(OIDAccessMethodIssuers, "http://ca.example.com/issuer.der"),
+		)},
+	)
+	return tpl
+}
+
+func ValidCQRPCATemplate() Template {
+	tpl := ValidCATemplate()
+	tpl.SPKIAlgorithm = Algorithm{OID: OIDMLDSA44}
+	tpl.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1312)
+	ReplaceExtension(&tpl, Extension{
+		ID:       OIDMTC_CA,
+		Critical: true,
+		Value: CAExtensionDER(
+			Algorithm{OID: OIDSHA256},
+			Algorithm{OID: OIDMLDSA44},
+			big.NewInt(100),
+			big.NewInt(999),
+		),
+	})
+	tpl.Extensions = append(tpl.Extensions, Extension{
+		ID:    OIDMTCTlogPrefixURL,
+		Value: MTCTlogPrefixURLDER("https://ca.example/mtc"),
+	})
+	return tpl
+}
+
+func ValidProof() Proof {
+	return Proof{Start: 0, End: 8}
+}
+
+func ProofBytes(proof Proof) []byte {
+	return ProofBytesForRevision(proof, "05")
+}
+
+func ProofBytesForRevision(proof Proof, revision string) []byte {
+	if revision != "05" && revision != "06" && revision != "07" {
+		panic("unsupported revision")
+	}
+	var extensions bytes.Buffer
+	for _, extension := range proof.Extensions {
+		writeUint16(&extensions, extension.Type)
+		writeVector16(&extensions, extension.Data)
+	}
+
+	var signatures bytes.Buffer
+	for _, signature := range proof.Signatures {
+		if len(signature.CosignerID) > 255 {
+			panic("cosigner ID exceeds uint8 length")
+		}
+		signatures.WriteByte(byte(len(signature.CosignerID)))
+		signatures.Write(signature.CosignerID)
+		writeVector16(&signatures, signature.Signature)
+	}
+
+	var encoded bytes.Buffer
+	writeVector16(&encoded, extensions.Bytes())
+	writeUint48(&encoded, proof.Start)
+	writeUint48(&encoded, proof.End)
+	writeVector16(&encoded, proof.InclusionProof)
+	if revision != "05" {
+		n := signatures.Len()
+		if n > 1<<24-1 {
+			panic("signatures exceeds vector24")
+		}
+		encoded.Write([]byte{byte(n >> 16), byte(n >> 8), byte(n)})
+		encoded.Write(signatures.Bytes())
+	} else {
+		writeVector16(&encoded, signatures.Bytes())
+	}
+	return encoded.Bytes()
+}
+
+func MalformedProofBytes() []byte {
+	valid := ProofBytes(ValidProof())
+	return clone(valid[:len(valid)-1])
+}
+
+func ValidCATemplate() Template {
+	tpl := ValidSubscriberTemplate()
+	tpl.Serial = big.NewInt(42)
+	tpl.TBSSignature = Algorithm{OID: OIDMLDSA65}
+	tpl.OuterSignature = Algorithm{OID: OIDMLDSA65}
+	tpl.SPKIAlgorithm = Algorithm{OID: OIDMLDSA65}
+	tpl.SubjectPublicKey = bytes.Repeat([]byte{0x5a}, 1952)
+	tpl.Issuer = der(0x30, nil)
+	tpl.Subject = ValidCAIDNameDER()
+	tpl.Extensions = []Extension{
+		{ID: OIDMTC_CA, Critical: true, Value: ValidCAExtensionDER()},
+		{ID: OIDKeyUsage, Critical: true, Value: KeyUsageDER(true)},
+		{ID: OIDBasicConstraints, Critical: true, Value: BasicConstraintsDER(true)},
+	}
+	tpl.Signature = []byte{0x01, 0x02, 0x03}
+	return tpl
+}
+
+func ValidUnsignedCATemplate() Template {
+	tpl := ValidCATemplate()
+	tpl.TBSSignature = Algorithm{OID: OIDUnsigned}
+	tpl.OuterSignature = Algorithm{OID: OIDUnsigned}
+	tpl.Issuer = clone(tpl.Subject)
+	tpl.Signature = nil
+	return tpl
+}
+
+func ReplaceExtension(tpl *Template, extension Extension) {
+	for i := range tpl.Extensions {
+		if tpl.Extensions[i].ID.Equal(extension.ID) {
+			tpl.Extensions[i] = extension
+			return
+		}
+	}
+	tpl.Extensions = append(tpl.Extensions, extension)
+}
+
+func RemoveExtension(tpl *Template, id asn1.ObjectIdentifier) {
+	filtered := tpl.Extensions[:0]
+	for _, extension := range tpl.Extensions {
+		if !extension.ID.Equal(id) {
+			filtered = append(filtered, extension)
+		}
+	}
+	tpl.Extensions = filtered
+}
+
+func KeyUsageDER(keyCertSign bool) []byte {
+	usage := uint16(0x8000)
+	if keyCertSign {
+		usage |= 0x0400
+	}
+	return KeyUsageBitsDER(usage)
+}
+
+func KeyUsageBitsDER(usage uint16) []byte {
+	if usage == 0 {
+		return bitString([]byte{0}, 7)
+	}
+	encoded := []byte{byte(usage >> 8)}
+	if usage&0xff != 0 {
+		encoded = append(encoded, byte(usage))
+	}
+	last := encoded[len(encoded)-1]
+	unused := 0
+	for last&1 == 0 {
+		unused++
+		last >>= 1
+	}
+	return bitString(encoded, unused)
+}
+
+func BasicConstraintsDER(ca bool) []byte {
+	if !ca {
+		return der(0x30, nil)
+	}
+	return der(0x30, []byte{0x01, 0x01, 0xff})
+}
+
+func SubjectKeyIdentifierDER(id []byte) []byte {
+	return der(0x04, clone(id))
+}
+
+func AuthorityKeyIdentifierDER(id []byte) []byte {
+	return der(0x30, der(0x80, clone(id)))
+}
+
+func AccessDescriptionDER(method asn1.ObjectIdentifier, uri string) []byte {
+	return AccessDescriptionWithLocationDER(method, URINameGeneralNameDER(uri))
+}
+
+func AccessDescriptionWithLocationDER(method asn1.ObjectIdentifier, location []byte) []byte {
+	return der(0x30, mustMarshal(method), clone(location))
+}
+
+func AuthorityInformationAccessDER(descriptions ...[]byte) []byte {
+	return der(0x30, descriptions...)
+}
+
+func CRLDistributionPointsDER(uris ...string) []byte {
+	distributionPoints := make([][]byte, 0, len(uris))
+	for _, uri := range uris {
+		fullName := der(0xa0, URINameGeneralNameDER(uri))
+		distributionPointName := der(0xa0, fullName)
+		distributionPoints = append(distributionPoints, der(0x30, distributionPointName))
+	}
+	return der(0x30, distributionPoints...)
+}
+
+func MTCTlogPrefixURLDER(value string) []byte {
+	return der(0x16, []byte(value))
+}
+
+func CertificatePoliciesDER(ids ...asn1.ObjectIdentifier) []byte {
+	policies := make([][]byte, 0, len(ids))
+	for _, id := range ids {
+		policies = append(policies, der(0x30, mustMarshal(id)))
+	}
+	return der(0x30, policies...)
+}
+
+func CertificatePolicyWithQualifierDER(policyID, qualifierID asn1.ObjectIdentifier, qualifier []byte) []byte {
+	qualifierInfo := der(0x30, mustMarshal(qualifierID), clone(qualifier))
+	policyQualifiers := der(0x30, qualifierInfo)
+	policy := der(0x30, mustMarshal(policyID), policyQualifiers)
+	return der(0x30, policy)
+}
+
+func IA5StringDER(value string) []byte {
+	return der(0x16, []byte(value))
+}
+
+func UTF8StringDER(value string) []byte {
+	return der(0x0c, []byte(value))
+}
+
+func PrintableStringDER(value string) []byte {
+	return der(0x13, []byte(value))
+}
+
+func T61StringDER(value string) []byte {
+	return der(0x14, []byte(value))
+}
+
+func ExtendedKeyUsageDER(ids ...asn1.ObjectIdentifier) []byte {
+	encoded := make([][]byte, 0, len(ids))
+	for _, id := range ids {
+		encoded = append(encoded, mustMarshal(id))
+	}
+	return der(0x30, encoded...)
+}
+
+type NameAttribute struct {
+	ID       asn1.ObjectIdentifier
+	Value    string
+	RawValue []byte
+}
+
+func NameDER(attributes ...NameAttribute) []byte {
+	rdns := make([][]byte, 0, len(attributes))
+	for _, attribute := range attributes {
+		value := attribute.RawValue
+		if value == nil {
+			value = mustMarshal(attribute.Value)
+		}
+		atv := der(0x30, mustMarshal(attribute.ID), value)
+		rdns = append(rdns, der(0x31, atv))
+	}
+	return der(0x30, rdns...)
+}
+
+func NameWithMultiValuedRDN(attributes ...NameAttribute) []byte {
+	atvs := make([][]byte, 0, len(attributes))
+	for _, attribute := range attributes {
+		value := attribute.RawValue
+		if value == nil {
+			value = mustMarshal(attribute.Value)
+		}
+		atvs = append(atvs, der(0x30, mustMarshal(attribute.ID), value))
+	}
+	return der(0x30, der(0x31, atvs...))
+}
+
+func DirectoryNameGeneralNameDER(name []byte) []byte {
+	return der(0xa4, clone(name))
+}
+
+func DNSNameGeneralNameDER(name string) []byte {
+	return der(0x82, []byte(name))
+}
+
+func IPAddressGeneralNameDER(address []byte) []byte {
+	return der(0x87, clone(address))
+}
+
+func URINameGeneralNameDER(uri string) []byte {
+	return der(0x86, []byte(uri))
+}
+
+func GeneralNamesDER(names ...[]byte) []byte {
+	return der(0x30, names...)
+}
+
+func Certificate(tpl Template) []byte {
+	return der(0x30,
+		TBSCertificate(tpl),
+		algorithmIdentifier(tpl.OuterSignature),
+		bitString(tpl.Signature, tpl.SignatureUnused),
+	)
+}
+
+func TBSCertificate(tpl Template) []byte {
+	fields := [][]byte{
+		der(0xa0, integer(big.NewInt(2))),
+		integer(tpl.Serial),
+		algorithmIdentifier(tpl.TBSSignature),
+		clone(tpl.Issuer),
+		validity(tpl.NotBefore, tpl.NotAfter),
+		clone(tpl.Subject),
+		der(0x30,
+			algorithmIdentifier(tpl.SPKIAlgorithm),
+			bitString(tpl.SubjectPublicKey, tpl.SubjectPublicKeyUnused),
+		),
+	}
+	if tpl.IssuerUniqueID != nil {
+		fields = append(fields, implicitBitString(0x81, tpl.IssuerUniqueID, tpl.IssuerUniqueIDUnused))
+	}
+	if tpl.SubjectUniqueID != nil {
+		fields = append(fields, implicitBitString(0x82, tpl.SubjectUniqueID, tpl.SubjectUniqueIDUnused))
+	}
+	if tpl.Extensions != nil {
+		encoded := make([][]byte, 0, len(tpl.Extensions))
+		for _, ext := range tpl.Extensions {
+			parts := [][]byte{mustMarshal(ext.ID)}
+			if ext.Critical {
+				parts = append(parts, []byte{0x01, 0x01, 0xff})
+			}
+			parts = append(parts, der(0x04, ext.Value))
+			encoded = append(encoded, der(0x30, parts...))
+		}
+		fields = append(fields, der(0xa3, der(0x30, encoded...)))
+	}
+	return der(0x30, fields...)
+}
+
+func ValidCAIDNameDER() []byte {
+	trustAnchorID := der(0x0c, []byte("32473.1"))
+	atv := der(0x30, mustMarshal(OIDCAID), trustAnchorID)
+	return der(0x30, der(0x31, atv))
+}
+
+func ValidCAID() []byte {
+	return []byte{0x81, 0xfd, 0x59, 0x01}
+}
+
+func ValidCAExtensionDER() []byte {
+	return CAExtensionDER(
+		Algorithm{OID: OIDSHA256},
+		Algorithm{OID: OIDMLDSA65},
+		big.NewInt(100),
+		big.NewInt(999),
+	)
+}
+
+func CAExtensionDER(logHash, signatureAlgorithm Algorithm, minSerial, maxSerial *big.Int) []byte {
+	return der(0x30,
+		algorithmIdentifier(logHash),
+		algorithmIdentifier(signatureAlgorithm),
+		integer(minSerial),
+		integer(maxSerial),
+	)
+}
+
+func WriteDraft06Fixtures(dir string) error {
+	tpl := ValidDraft06SubscriberTemplate()
+	standalone := tpl
+	standalone.Signature = ProofBytesForRevision(Proof{Start: 0, End: 8, Signatures: []ProofSignature{{CosignerID: ValidCAID(), Signature: []byte{1, 2, 3}}}}, "06")
+	fixtures := map[string]*pem.Block{
+		"draft06-ca.pem":             {Type: "CERTIFICATE", Bytes: Certificate(ValidDraft06CATemplate())},
+		"draft06-standalone.pem":     {Type: "CERTIFICATE", Bytes: Certificate(standalone)},
+		"draft06-landmark.pem":       {Type: "CERTIFICATE", Bytes: Certificate(tpl)},
+		"draft06-subscriber-tbs.pem": {Type: "TBS CERTIFICATE", Bytes: TBSCertificate(tpl)},
+	}
+	for name, block := range fixtures {
+		if err := os.WriteFile(filepath.Join(dir, name), pem.EncodeToMemory(block), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func WriteGeneratedFixtures(dir string) error {
+	fixtures := []struct {
+		name     string
+		pemType  string
+		contents []byte
+	}{
+		{"draft05-ca.pem", "CERTIFICATE", Certificate(ValidCATemplate())},
+		{"cqrp-ca.pem", "CERTIFICATE", Certificate(ValidCQRPCATemplate())},
+		{"draft05-subscriber-tbs.pem", "TBS CERTIFICATE", TBSCertificate(ValidSubscriberTemplate())},
+		{"cqrp-subscriber.pem", "CERTIFICATE", Certificate(ValidCQRPSubscriberTemplate())},
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	for _, fixture := range fixtures {
+		encoded := pem.EncodeToMemory(&pem.Block{Type: fixture.pemType, Bytes: fixture.contents})
+		if err := os.WriteFile(filepath.Join(dir, fixture.name), encoded, 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", fixture.name, err)
+		}
+	}
+	return nil
+}
+
+func algorithmIdentifier(algorithm Algorithm) []byte {
+	parts := [][]byte{mustMarshal(algorithm.OID)}
+	if algorithm.ParametersPresent {
+		parts = append(parts, clone(algorithm.Parameters))
+	}
+	return der(0x30, parts...)
+}
+
+func validity(notBefore, notAfter time.Time) []byte {
+	return der(0x30, mustMarshal(notBefore), mustMarshal(notAfter))
+}
+
+func integer(value *big.Int) []byte {
+	if value == nil {
+		panic("nil integer")
+	}
+	return mustMarshal(value)
+}
+
+func bitString(contents []byte, unused int) []byte {
+	return der(0x03, append([]byte{byte(unused)}, contents...))
+}
+
+func implicitBitString(tag byte, contents []byte, unused int) []byte {
+	return der(tag, append([]byte{byte(unused)}, contents...))
+}
+
+func der(tag byte, values ...[]byte) []byte {
+	contents := bytes.Join(values, nil)
+	return append(append([]byte{tag}, derLength(len(contents))...), contents...)
+}
+
+func derLength(length int) []byte {
+	if length < 0x80 {
+		return []byte{byte(length)}
+	}
+	var encoded [8]byte
+	i := len(encoded)
+	for length > 0 {
+		i--
+		encoded[i] = byte(length)
+		length >>= 8
+	}
+	return append([]byte{0x80 | byte(len(encoded)-i)}, encoded[i:]...)
+}
+
+func mustMarshal(value any) []byte {
+	encoded, err := asn1.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return encoded
+}
+
+func clone(input []byte) []byte {
+	return append([]byte(nil), input...)
+}
+
+func writeVector16(output *bytes.Buffer, contents []byte) {
+	if len(contents) > 65535 {
+		panic("vector exceeds uint16 length")
+	}
+	writeUint16(output, uint16(len(contents)))
+	output.Write(contents)
+}
+
+func writeUint16(output *bytes.Buffer, value uint16) {
+	output.WriteByte(byte(value >> 8))
+	output.WriteByte(byte(value))
+}
+
+func writeUint48(output *bytes.Buffer, value uint64) {
+	if value > (1<<48)-1 {
+		panic("value exceeds uint48")
+	}
+	output.Write([]byte{
+		byte(value >> 40),
+		byte(value >> 32),
+		byte(value >> 24),
+		byte(value >> 16),
+		byte(value >> 8),
+		byte(value),
+	})
+}

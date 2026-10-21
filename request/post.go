@@ -3,7 +3,6 @@ package request
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/pkimetal/pkimetal/health"
 	"github.com/pkimetal/pkimetal/linter"
 	"github.com/pkimetal/pkimetal/logger"
+	"github.com/pkimetal/pkimetal/mtc"
 	"github.com/pkimetal/pkimetal/utils"
 
 	json "github.com/goccy/go-json"
@@ -26,9 +26,11 @@ type RequestInfo struct {
 	profileId       linter.ProfileId
 	minimumSeverity linter.SeverityLevel
 	// Input(s), in various original/processed forms.
-	b64Input     []byte // PEM or base64-encoded string.
-	decodedInput []byte
-	cert         *x509.Certificate
+	b64Input      []byte // PEM or base64-encoded string.
+	decodedInput  []byte
+	cert          *x509.Certificate
+	mtcArtifact   *mtc.Artifact
+	legacyCertErr error
 }
 
 type LintResult struct {
@@ -73,11 +75,17 @@ func POST(fhctx *fasthttp.RequestCtx, path string) int {
 		if !ri.GetPOSTEndpoint(path) {
 			status = fasthttp.StatusNotFound
 			logger.SetDetails(fhctx, zap.InfoLevel, "Invalid endpoint", nil, nil)
+			fhctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+			fhctx.SetStatusCode(status)
+			doneChan <- 0
+			return
 		} else if responseFormat = getResponseFormat(fhctx); responseFormat == -1 {
 			errorMessage = "Unrecognised response format"
 		} else if requestBody := fhctx.Request.Body(); len(requestBody) == 0 {
 			errorMessage = "Empty request body"
 		} else if err = ri.GetInput(fhctx); err != nil {
+			errorMessage = "Unrecognised input"
+		} else if err = ri.deferredCertificateInputError(paramS(fhctx, "profile")); err != nil {
 			errorMessage = "Unrecognised input"
 		} else if !ri.GetProfile(paramS(fhctx, "profile")) {
 			errorMessage = "Unrecognised profile"
@@ -90,6 +98,7 @@ func POST(fhctx *fasthttp.RequestCtx, path string) int {
 				B64Input:     utils.B2S(ri.b64Input),
 				DecodedInput: ri.decodedInput,
 				Cert:         ri.cert,
+				MTCArtifact:  ri.mtcArtifact,
 				ProfileId:    ri.profileId,
 				QueuedAt:     time.Now(),
 				RespChannel:  make(chan linter.LintingResult),
@@ -99,14 +108,19 @@ func POST(fhctx *fasthttp.RequestCtx, path string) int {
 			var lresp []linter.LintingResult
 			nlresp := 0
 			for _, l := range linter.Linters {
-				if isApplicable := !slices.Contains(l.Unsupported, lreq.ProfileId); isApplicable && (l.NumInstances > 0) {
+				isApplicable, reason := l.EvaluateApplicability(&lreq)
+				if isApplicable && (l.NumInstances > 0) {
 					l.ReqChannel <- lreq
 					nlresp++
 				} else {
+					finding := fmt.Sprintf("%s: Not used [Available:%t, Applicable:%t]", l.Name, (l.NumInstances > 0), isApplicable)
+					if reason != "" {
+						finding += fmt.Sprintf(" [Reason:%s]", reason)
+					}
 					lresp = append(lresp, linter.LintingResult{
 						LinterName: l.Name,
 						Severity:   linter.SEVERITY_META,
-						Finding:    fmt.Sprintf("%s: Not used [Available:%t, Applicable:%t]", l.Name, (l.NumInstances > 0), isApplicable),
+						Finding:    finding,
 					})
 				}
 			}
@@ -186,6 +200,9 @@ func POST(fhctx *fasthttp.RequestCtx, path string) int {
 			status = sendJSONResponse(fhctx, lrespFiltered)
 		case config.RESPONSEFORMAT_TEXT:
 			status = sendTEXTResponse(fhctx, lrespFiltered)
+		}
+		if errorMessage != "" {
+			status = fasthttp.StatusBadRequest
 		}
 		fhctx.SetStatusCode(status)
 		doneChan <- 0

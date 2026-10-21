@@ -1,0 +1,410 @@
+package mtclint
+
+import (
+	"context"
+	"encoding/pem"
+	"fmt"
+	"os"
+	"path/filepath"
+	"reflect"
+	"slices"
+	"testing"
+
+	"github.com/pkimetal/pkimetal/internal/mtctest"
+	"github.com/pkimetal/pkimetal/linter"
+	"github.com/pkimetal/pkimetal/mtc"
+	"github.com/zmap/zcrypto/x509"
+)
+
+func TestRegistration(t *testing.T) {
+	var registered []*linter.Linter
+	for _, candidate := range linter.Linters {
+		if candidate.Name == "mtclint" {
+			registered = append(registered, candidate)
+		}
+	}
+	if len(registered) != 1 {
+		t.Fatalf("mtclint registrations = %d, want 1", len(registered))
+	}
+	got := registered[0]
+	if got.Version != "draft-05/draft-06/draft-07" {
+		t.Errorf("version = %q, want draft-05/draft-06/draft-07", got.Version)
+	}
+	if got.Url != "https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-07" {
+		t.Errorf("URL = %q", got.Url)
+	}
+	if got.NumInstances != 1 {
+		t.Errorf("instances = %d, want 1", got.NumInstances)
+	}
+
+	supported := []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER}
+	if !slices.Equal(got.Supported, supported) {
+		t.Errorf("supported = %#v, want %#v", got.Supported, supported)
+	}
+	for id := range linter.AllProfiles {
+		if gotSupported := got.Supports(id); gotSupported != slices.Contains(supported, id) {
+			t.Errorf("profile %s supported = %t", linter.AllProfiles[id].Name, gotSupported)
+		}
+	}
+}
+
+func TestDraft06WrongRevisionProfiles(t *testing.T) {
+	legacy := parseArtifact(t, mtctest.ValidSubscriberTemplate(), mtc.InputCertificate)
+	assertHasCode(t, handle(t, linter.MTC_DRAFT06_SUBSCRIBER, legacy), "e_mtc_profile_revision_mismatch")
+	tpl := mtctest.ValidDraft06SubscriberTemplate()
+	current := parseArtifact(t, tpl, mtc.InputCertificate)
+	if got := handle(t, linter.MTC_DRAFT06_SUBSCRIBER, current); len(got) != 0 {
+		t.Fatal(got)
+	}
+	assertHasCode(t, handle(t, linter.MTC_SUBSCRIBER, current), "e_mtc_profile_revision_mismatch")
+	if got := handle(t, linter.CQRP_MTC_SUBSCRIBER, current); len(got) != 0 {
+		t.Fatalf("CQRP policy profile rejected typed draft-06 base: %#v", got)
+	}
+	assertHasCode(t, handle(t, linter.MTC_DRAFT06_CA, current), "e_mtc_profile_artifact_mismatch")
+}
+
+func TestExportedRevisionFixturesUseTheirExplicitProfiles(t *testing.T) {
+	for _, tc := range []struct {
+		file    string
+		profile linter.ProfileId
+		kind    mtc.InputKind
+	}{
+		{"draft05-ca.pem", linter.MTC_CA, mtc.InputCertificate},
+		{"draft05-subscriber-tbs.pem", linter.MTC_SUBSCRIBER, mtc.InputTBSCertificate},
+		{"draft06-ca.pem", linter.MTC_DRAFT06_CA, mtc.InputCertificate},
+		{"draft06-standalone.pem", linter.MTC_DRAFT06_SUBSCRIBER, mtc.InputCertificate},
+		{"draft06-landmark.pem", linter.MTC_DRAFT06_SUBSCRIBER, mtc.InputCertificate},
+		{"draft06-subscriber-tbs.pem", linter.MTC_DRAFT06_SUBSCRIBER, mtc.InputTBSCertificate},
+		{"draft06-ca.pem", linter.CQRP_MTC_CA, mtc.InputCertificate},
+		{"draft06-standalone.pem", linter.CQRP_MTC_SUBSCRIBER, mtc.InputCertificate},
+		{"draft06-landmark.pem", linter.CQRP_MTC_SUBSCRIBER, mtc.InputCertificate},
+		{"draft06-subscriber-tbs.pem", linter.CQRP_MTC_SUBSCRIBER, mtc.InputTBSCertificate},
+	} {
+		t.Run(tc.file, func(t *testing.T) {
+			data, err := os.ReadFile(filepath.Join("..", "..", "mtc", "testdata", tc.file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			block, rest := pem.Decode(data)
+			if block == nil || len(rest) != 0 {
+				t.Fatal("expected one exported DER artifact")
+			}
+			artifact, err := mtc.Parse(block.Bytes, tc.kind)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if findings := handle(t, tc.profile, artifact); len(findings) != 0 {
+				t.Fatalf("explicit %s findings: %#v", linter.AllProfiles[tc.profile].Name, findings)
+			}
+		})
+	}
+}
+
+func TestDraft06CosignerParserRejectionsKeepSpecificFindings(t *testing.T) {
+	for _, tc := range []struct {
+		ids  [][]byte
+		code string
+	}{
+		{[][]byte{{1}, {1}}, "e_mtc_proof_cosigner_duplicate"},
+		{[][]byte{{2}, {1}}, "e_mtc_proof_cosigner_order"},
+		{[][]byte{{0, 0}, {2}}, "e_mtc_proof_cosigner_order"},
+	} {
+		tpl := mtctest.ValidDraft06SubscriberTemplate()
+		proof := mtctest.Proof{Start: 0, End: 8}
+		for _, id := range tc.ids {
+			proof.Signatures = append(proof.Signatures, mtctest.ProofSignature{CosignerID: id, Signature: []byte{7}})
+		}
+		tpl.Signature = mtctest.ProofBytesForRevision(proof, "06")
+		artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+		if artifact.ProofParseError == nil {
+			t.Fatal("certificate parse did not retain parser rejection")
+		}
+		assertHasCode(t, handle(t, linter.MTC_DRAFT06_SUBSCRIBER, artifact), tc.code)
+	}
+}
+
+func TestInstanceLifecycleAndResultProcessing(t *testing.T) {
+	handler := &MTCLint{}
+	useHandleRequest, directory, cmd, args := handler.StartInstance()
+	if !useHandleRequest || directory != "" || cmd != "" || args != nil {
+		t.Fatalf("StartInstance() = %t, %q, %q, %#v", useHandleRequest, directory, cmd, args)
+	}
+	handler.StopInstance(nil)
+	want := linter.LintingResult{Finding: "finding", Field: "field", Code: "code", Severity: linter.SEVERITY_WARNING}
+	if got := handler.ProcessResult(want); got != want {
+		t.Fatalf("ProcessResult() = %#v, want %#v", got, want)
+	}
+}
+
+func TestDraftProfilesHandleValidArtifactsAndMutations(t *testing.T) {
+	tests := []struct {
+		name     string
+		profile  linter.ProfileId
+		template mtctest.Template
+		mutate   func(*mtctest.Template)
+		wantCode string
+	}{
+		{"CA", linter.MTC_CA, mtctest.ValidCATemplate(), func(tpl *mtctest.Template) { mtctest.RemoveExtension(tpl, mtctest.OIDBasicConstraints) }, "e_mtc_ca_basic_constraints_missing"},
+		{"subscriber", linter.MTC_SUBSCRIBER, mtctest.ValidSubscriberTemplate(), func(tpl *mtctest.Template) { tpl.Serial.SetInt64(9) }, "e_mtc_serial_log_number_zero"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			valid := parseArtifact(t, tc.template, mtc.InputCertificate)
+			if got := handle(t, tc.profile, valid); len(got) != 0 {
+				t.Fatalf("valid artifact findings = %#v", got)
+			}
+			tc.mutate(&tc.template)
+			invalid := parseArtifact(t, tc.template, mtc.InputCertificate)
+			assertHasCode(t, handle(t, tc.profile, invalid), tc.wantCode)
+		})
+	}
+}
+
+func TestCQRPProfilesAlsoRunDraftRulesButNotCQRPPolicy(t *testing.T) {
+	tpl := mtctest.ValidCQRPSubscriberTemplate()
+	tpl.Serial.SetInt64(9)
+	tpl.NotAfter = tpl.NotBefore.AddDate(0, 0, 48)
+	results := handle(t, linter.CQRP_MTC_SUBSCRIBER, parseArtifact(t, tpl, mtc.InputCertificate))
+	assertHasCode(t, results, "e_mtc_serial_log_number_zero")
+	assertLacksCode(t, results, "e_cqrp_subscriber_validity_too_long")
+}
+
+func TestSubscriberProfilesAlwaysRunRFC5280SANRules(t *testing.T) {
+	for _, profile := range []linter.ProfileId{linter.MTC_SUBSCRIBER, linter.CQRP_MTC_SUBSCRIBER} {
+		tpl := mtctest.ValidCQRPSubscriberTemplate()
+		mtctest.RemoveExtension(&tpl, mtctest.OIDSubjectAltName)
+		artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+
+		withoutLegacyCertificate := (&MTCLint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{ProfileId: profile, MTCArtifact: artifact})
+		assertHasCode(t, withoutLegacyCertificate, "e_rfc5280_mtc_subscriber_san_missing")
+
+		withLegacyCertificate := (&MTCLint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{ProfileId: profile, MTCArtifact: artifact, Cert: &x509.Certificate{}})
+		assertHasCode(t, withLegacyCertificate, "e_rfc5280_mtc_subscriber_san_missing")
+	}
+}
+
+func TestSubscriberProfilesRunNativeRFCRulesWithoutZCryptoCertificate(t *testing.T) {
+	for _, profile := range []linter.ProfileId{linter.MTC_SUBSCRIBER, linter.CQRP_MTC_SUBSCRIBER} {
+		tpl := mtctest.ValidCQRPSubscriberTemplate()
+		tpl.NotAfter = tpl.NotBefore
+		artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+
+		results := (&MTCLint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{ProfileId: profile, MTCArtifact: artifact})
+		assertHasCode(t, results, "e_rfc5280_mtc_subscriber_validity_order")
+	}
+}
+
+func TestGenericCAConditionallyRunsMTCTlogRules(t *testing.T) {
+	tpl := mtctest.ValidCATemplate()
+	assertLacksCode(t, handle(t, linter.MTC_CA, parseArtifact(t, tpl, mtc.InputCertificate)), "e_cqrp_ca_mtc_tlog_extension_missing")
+
+	tpl.Extensions = append(tpl.Extensions, mtctest.Extension{ID: mtctest.OIDMTCTlogPrefixURL, Value: []byte{0x0c, 0x01, 'x'}})
+	results := handle(t, linter.MTC_CA, parseArtifact(t, tpl, mtc.InputCertificate))
+	assertCodeCount(t, results, "e_mtc_tlog_extension_malformed", 1)
+
+	results = handle(t, linter.CQRP_MTC_CA, parseArtifact(t, tpl, mtc.InputCertificate))
+	assertLacksCode(t, results, "e_mtc_tlog_extension_malformed")
+}
+
+func TestExpectedProfileKindControlsRulesAndReportsMismatch(t *testing.T) {
+	tests := []struct {
+		name        string
+		profile     linter.ProfileId
+		template    mtctest.Template
+		wantFinding string
+		wantCode    string
+	}{
+		{
+			name:        "CA artifact selected as subscriber",
+			profile:     linter.MTC_SUBSCRIBER,
+			template:    mtctest.ValidCATemplate(),
+			wantFinding: "[pkimetal profile dispatch §Explicit MTC profile selection] Selected profile \"mtc_subscriber\" expects subscriber artifact; actual artifact kind is ca",
+			wantCode:    "e_mtc_signature_algorithm_oid",
+		},
+		{
+			name:        "subscriber artifact selected as CQRP CA",
+			profile:     linter.CQRP_MTC_CA,
+			template:    mtctest.ValidSubscriberTemplate(),
+			wantFinding: "[pkimetal profile dispatch §Explicit MTC profile selection] Selected profile \"cqrp_mtc_ca\" expects ca artifact; actual artifact kind is subscriber",
+			wantCode:    "e_mtc_ca_extension_missing",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			artifact := parseArtifact(t, tc.template, mtc.InputCertificate)
+			before := fmt.Sprintf("%#v", artifact)
+			results := handle(t, tc.profile, artifact)
+			if len(results) == 0 || results[0] != (linter.LintingResult{
+				Finding:  tc.wantFinding,
+				Field:    "profile",
+				Code:     "e_mtc_profile_artifact_mismatch",
+				Severity: linter.SEVERITY_ERROR,
+			}) {
+				t.Fatalf("first mismatch finding = %#v", results)
+			}
+			assertHasCode(t, results, tc.wantCode)
+			if after := fmt.Sprintf("%#v", artifact); after != before {
+				t.Fatal("handler mutated caller artifact")
+			}
+		})
+	}
+}
+
+func TestArtifactTypeConflictIsReportedExactlyOnceForEitherExplicitProfile(t *testing.T) {
+	tpl := mtctest.ValidCATemplate()
+	tpl.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDMTCProof}
+	tpl.OuterSignature = tpl.TBSSignature
+	tpl.Issuer = mtctest.ValidCAIDNameDER()
+	tpl.Serial.SetUint64((1 << 48) | 7)
+	tpl.Signature = mtctest.ProofBytes(mtctest.ValidProof())
+	artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+
+	for _, profile := range []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER} {
+		results := handle(t, profile, artifact)
+		count := 0
+		for _, result := range results {
+			if result.Code == "e_mtc_artifact_type_conflict" {
+				count++
+				if result.Field != "tbsCertificate.signature,tbsCertificate.extensions.mtcCertificationAuthority" ||
+					result.Severity != linter.SEVERITY_ERROR ||
+					result.Finding != "[draft-ietf-plants-merkle-tree-certs-05 §5.5 and 6.2] Artifact matches both MTC CA and subscriber syntax" {
+					t.Errorf("profile %v: conflict finding = %#v", profile, result)
+				}
+			}
+		}
+		if count != 1 {
+			t.Fatalf("profile %v: conflict count = %d, results = %#v", profile, count, results)
+		}
+	}
+}
+
+func TestNilAndUnknownArtifactsReportMismatchWithoutPanicking(t *testing.T) {
+	want := linter.LintingResult{
+		Finding:  "[pkimetal profile dispatch §Explicit MTC profile selection] Selected profile \"mtc_ca\" expects ca artifact; actual artifact kind is unrecognized",
+		Field:    "profile",
+		Code:     "e_mtc_profile_artifact_mismatch",
+		Severity: linter.SEVERITY_ERROR,
+	}
+	for _, req := range []*linter.LintingRequest{
+		{ProfileId: linter.MTC_CA},
+		{ProfileId: linter.MTC_CA, MTCArtifact: &mtc.Artifact{Kind: mtc.ArtifactUnknown, InputKind: mtc.InputCertificate}},
+	} {
+		got := (&MTCLint{}).HandleRequest(context.Background(), nil, req)
+		if len(got) == 0 || got[0] != want {
+			t.Fatalf("mismatch = %#v, want first %#v", got, want)
+		}
+	}
+	if got := (&MTCLint{}).HandleRequest(context.Background(), nil, nil); got != nil {
+		t.Fatalf("nil request results = %#v", got)
+	}
+	if got := (&MTCLint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{ProfileId: linter.RFC5280_ROOT}); got != nil {
+		t.Fatalf("unsupported profile results = %#v", got)
+	}
+}
+
+func TestExplicitSubscriberProfileRunsDraftRulesForUnknownArtifact(t *testing.T) {
+	tpl := mtctest.ValidSubscriberTemplate()
+	tpl.TBSSignature = mtctest.Algorithm{OID: mtctest.OIDSHA256}
+	tpl.OuterSignature = tpl.TBSSignature
+	tpl.Issuer = []byte{0x30, 0x00}
+	artifact := parseArtifact(t, tpl, mtc.InputCertificate)
+	if artifact.Kind != mtc.ArtifactUnknown {
+		t.Fatalf("artifact kind = %v, want unknown", artifact.Kind)
+	}
+
+	results := handle(t, linter.MTC_SUBSCRIBER, artifact)
+	assertHasCode(t, results, "e_mtc_profile_artifact_mismatch")
+	assertHasCode(t, results, "e_mtc_signature_algorithm_oid")
+	assertHasCode(t, results, "e_mtc_subscriber_issuer_not_ca_id")
+}
+
+func TestExplicitCAProfileRunsDraftRulesForUnknownArtifact(t *testing.T) {
+	tpl := mtctest.ValidCATemplate()
+	mtctest.RemoveExtension(&tpl, mtctest.OIDMTC_CA)
+	tpl.Subject = []byte{0x30, 0x00}
+	artifact := parseArtifact(t, tpl, mtc.InputTBSCertificate)
+	if artifact.Kind != mtc.ArtifactUnknown {
+		t.Fatalf("artifact kind = %v, want unknown", artifact.Kind)
+	}
+
+	results := handle(t, linter.MTC_CA, artifact)
+	assertHasCode(t, results, "e_mtc_profile_artifact_mismatch")
+	assertHasCode(t, results, "e_mtc_ca_subject_not_ca_id")
+	assertHasCode(t, results, "e_mtc_ca_extension_missing")
+}
+
+func TestTBSSkipsOuterSignatureAndProofRules(t *testing.T) {
+	tpl := mtctest.ValidSubscriberTemplate()
+	tpl.OuterSignature.OID = mtctest.OIDSHA256
+	tpl.Signature = mtctest.MalformedProofBytes()
+	results := handle(t, linter.MTC_SUBSCRIBER, parseArtifact(t, tpl, mtc.InputTBSCertificate))
+	for _, code := range []string{
+		"e_mtc_cert_signature_algorithm_mismatch",
+		"f_mtc_proof_malformed",
+		"e_mtc_proof_cosigner_id_empty",
+	} {
+		assertLacksCode(t, results, code)
+	}
+}
+
+func TestMismatchResultsAreDeterministic(t *testing.T) {
+	artifact := parseArtifact(t, mtctest.ValidCATemplate(), mtc.InputCertificate)
+	first := handle(t, linter.MTC_SUBSCRIBER, artifact)
+	for i := 0; i < 10; i++ {
+		if got := handle(t, linter.MTC_SUBSCRIBER, artifact); !reflect.DeepEqual(got, first) {
+			t.Fatalf("run %d results differ:\n%#v\n%#v", i, got, first)
+		}
+	}
+}
+
+func parseArtifact(t *testing.T, tpl mtctest.Template, inputKind mtc.InputKind) *mtc.Artifact {
+	t.Helper()
+	input := mtctest.Certificate(tpl)
+	if inputKind == mtc.InputTBSCertificate {
+		input = mtctest.TBSCertificate(tpl)
+	}
+	artifact, err := mtc.Parse(input, inputKind)
+	if err != nil {
+		t.Fatalf("parse artifact: %v", err)
+	}
+	return artifact
+}
+
+func handle(t *testing.T, profile linter.ProfileId, artifact *mtc.Artifact) []linter.LintingResult {
+	t.Helper()
+	req := &linter.LintingRequest{ProfileId: profile, MTCArtifact: artifact}
+	return (&MTCLint{}).HandleRequest(context.Background(), nil, req)
+}
+
+func assertHasCode(t *testing.T, results []linter.LintingResult, code string) {
+	t.Helper()
+	for _, result := range results {
+		if result.Code == code {
+			return
+		}
+	}
+	t.Errorf("missing finding %s in %#v", code, results)
+}
+
+func assertLacksCode(t *testing.T, results []linter.LintingResult, code string) {
+	t.Helper()
+	for _, result := range results {
+		if result.Code == code {
+			t.Errorf("unexpected finding %s in %#v", code, results)
+			return
+		}
+	}
+}
+
+func assertCodeCount(t *testing.T, results []linter.LintingResult, code string, want int) {
+	t.Helper()
+	got := 0
+	for _, result := range results {
+		if result.Code == code {
+			got++
+		}
+	}
+	if got != want {
+		t.Errorf("finding %s count = %d, want %d in %#v", code, got, want, results)
+	}
+}

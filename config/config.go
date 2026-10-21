@@ -49,6 +49,9 @@ type config struct {
 		Ctlint struct {
 			NumGoroutines int `mapstructure:"numGoroutines"`
 		}
+		Cqrplint struct {
+			NumGoroutines int `mapstructure:"numGoroutines"`
+		} `mapstructure:"cqrplint"`
 		Dwklint struct {
 			NumGoroutines   int    `mapstructure:"numGoroutines"`
 			BlocklistDBPath string `mapstructure:"blocklistDBPath"`
@@ -57,6 +60,9 @@ type config struct {
 			NumProcesses int    `mapstructure:"numProcesses"`
 			PythonDir    string `mapstructure:"pythonDir"`
 		}
+		Mtclint struct {
+			NumGoroutines int `mapstructure:"numGoroutines"`
+		} `mapstructure:"mtclint"`
 		Pkilint struct {
 			NumProcesses int    `mapstructure:"numProcesses"`
 			PythonDir    string `mapstructure:"pythonDir"`
@@ -162,12 +168,10 @@ func init() {
 }
 
 func initViper() error {
-	// Imports config file values from least to most specific.
-	viper.SetConfigName("config.yaml")
+	// Deployment policy is read directly from one application.yml file.
+	viper.SetConfigName("application")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("/config")  // /config/config.yaml
-	viper.AddConfigPath("./config") // ./config/config.yaml
-	viper.AddConfigPath(".")        // ./config.yaml
+	viper.AddConfigPath(".")
 
 	// Setup Viper to also look at environment variables.
 	viper.SetEnvPrefix(ApplicationNamespace)
@@ -199,10 +203,12 @@ func initViper() error {
 	viper.SetDefault("linter.certlint.numProcesses", 1)
 	viper.SetDefault("linter.certlint.rubyDir", "autodetect")
 	viper.SetDefault("linter.ctlint.numGoroutines", 1)
+	viper.SetDefault("linter.cqrplint.numGoroutines", 1)
 	viper.SetDefault("linter.dwklint.numGoroutines", 1)
 	viper.SetDefault("linter.dwklint.blocklistDBPath", "")
 	viper.SetDefault("linter.ftfy.numProcesses", 1)
 	viper.SetDefault("linter.ftfy.pythonDir", "autodetect")
+	viper.SetDefault("linter.mtclint.numGoroutines", 1)
 	viper.SetDefault("linter.pkilint.numProcesses", 1)
 	viper.SetDefault("linter.pkilint.pythonDir", "autodetect")
 	viper.SetDefault("linter.pwnedkeys.numGoroutines", 0)
@@ -221,7 +227,11 @@ func initViper() error {
 	viper.SetDefault("logging.samplingThereafter", math.MaxInt) // See https://pkg.go.dev/go.uber.org/zap/zapcore#NewSamplerWithOptions for more information.
 
 	// Render results to Config Struct.
-	_ = viper.ReadInConfig() // Ignore errors, because we also support reading config from environment variables.
+	if err := viper.ReadInConfig(); err != nil {
+		if _, missing := err.(viper.ConfigFileNotFoundError); !missing {
+			return fmt.Errorf("read application.yml: %w", err)
+		}
+	}
 	return viper.Unmarshal(&Config)
 }
 

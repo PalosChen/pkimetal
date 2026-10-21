@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 
 	"github.com/pkimetal/pkimetal/linter"
+	"github.com/pkimetal/pkimetal/mtc"
 
 	"github.com/crtsh/ccadb_data"
 	"github.com/zmap/zcrypto/encoding/asn1"
@@ -196,12 +197,41 @@ func (ri *RequestInfo) GetProfile(profileName string) bool {
 
 	// Perform profile autodetection, if necessary.
 	if ri.profileId == linter.AUTODETECT {
+		if ri.mtcArtifact != nil {
+			if ri.mtcArtifact.RevisionError != nil {
+				return false
+			}
+			if ri.mtcArtifact.Kind != mtc.ArtifactUnknown && ri.mtcArtifact.Revision == "" {
+				return false
+			}
+			switch ri.mtcArtifact.Kind {
+			case mtc.ArtifactCA:
+				ri.profileId = linter.MTC_CA
+				if ri.mtcArtifact.Revision == "06" {
+					ri.profileId = linter.MTC_DRAFT06_CA
+				} else if ri.mtcArtifact.Revision == "07" {
+					ri.profileId = linter.MTC_DRAFT07_CA
+				}
+				return true
+			case mtc.ArtifactSubscriber:
+				ri.profileId = linter.MTC_SUBSCRIBER
+				if ri.mtcArtifact.Revision == "06" {
+					ri.profileId = linter.MTC_DRAFT06_SUBSCRIBER
+				} else if ri.mtcArtifact.Revision == "07" {
+					ri.profileId = linter.MTC_DRAFT07_SUBSCRIBER
+				}
+				return true
+			}
+		}
 		switch ri.endpoint {
 		case ENDPOINT_LINTCRL, ENDPOINT_LINTTBSCRL:
 			ri.profileId = ri.detectCRLProfile()
 		case ENDPOINT_LINTOCSP, ENDPOINT_LINTTBSOCSP:
 			ri.profileId = linter.RFC6960_OCSPRESPONSE
 		case ENDPOINT_LINTCERT, ENDPOINT_LINTTBSCERT:
+			if ri.cert == nil {
+				return false
+			}
 			if isRootCertificate(ri.cert) {
 				ri.profileId = ri.detectRootCertificateProfile()
 			} else if ri.cert.BasicConstraintsValid && ri.cert.IsCA {

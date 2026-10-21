@@ -7,11 +7,239 @@ import (
 	cryptox509 "crypto/x509"
 	"crypto/x509/pkix"
 	"math/big"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/pkimetal/pkimetal/internal/mtctest"
 	"github.com/pkimetal/pkimetal/linter"
+	"github.com/pkimetal/pkimetal/mtc"
+	"github.com/zmap/zcrypto/x509"
+	zpkix "github.com/zmap/zcrypto/x509/pkix"
+	"github.com/zmap/zlint/v3/lint"
+	"github.com/zmap/zlint/v3/util"
 )
+
+func registeredZlint(t *testing.T) *linter.Linter {
+	t.Helper()
+	for _, registered := range linter.Linters {
+		if registered.Name == "zlint" {
+			return registered
+		}
+	}
+	t.Fatal("zlint is not registered")
+	return nil
+}
+
+func TestRegistrationDeclaresMTCApplicability(t *testing.T) {
+	registered := registeredZlint(t)
+	want := []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER}
+	if !slices.Equal(registered.Supported, want) {
+		t.Fatalf("supported profiles = %#v, want %#v", registered.Supported, want)
+	}
+	if registered.Applicable == nil {
+		t.Fatal("zlint applicability callback is nil")
+	}
+	if applicable, reason := registered.Applicable(nil); applicable || reason != "" {
+		t.Fatalf("nil request applicability = %t, %q", applicable, reason)
+	}
+	if applicable, reason := registered.Applicable(&linter.LintingRequest{ProfileId: linter.MTC_CA}); applicable || reason != "zcrypto could not safely parse this MTC artifact" {
+		t.Fatalf("nil MTC certificate applicability = %t, %q", applicable, reason)
+	}
+	if applicable, reason := registered.Applicable(&linter.LintingRequest{ProfileId: linter.MTC_CA, Cert: &x509.Certificate{}}); !applicable || reason != "" {
+		t.Fatalf("usable MTC certificate applicability = %t, %q", applicable, reason)
+	}
+	if applicable, reason := registered.Applicable(&linter.LintingRequest{ProfileId: linter.RFC5280_ROOT}); !applicable || reason != "" {
+		t.Fatalf("legacy applicability = %t, %q", applicable, reason)
+	}
+	for _, profile := range []linter.ProfileId{linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER} {
+		if applicable, reason := registered.Applicable(&linter.LintingRequest{ProfileId: profile}); applicable || reason != "zcrypto could not safely parse this MTC artifact" {
+			t.Fatal("draft06 nil certificate not skipped")
+		}
+	}
+}
+
+func TestCQRPMTCLeafRegistryExcludesOnlyKnownMTCConflicts(t *testing.T) {
+	for _, name := range []string{
+		"e_signature_algorithm_not_supported",
+		"e_public_key_type_not_allowed",
+		"e_algorithm_identifier_improper_encoding",
+		"w_ct_sct_policy_count_unsatisfied",
+	} {
+		if cqrpMTCLeafRegistry.CertificateLints().ByName(name) != nil {
+			t.Errorf("%s was not excluded", name)
+		}
+	}
+	for _, name := range []string{
+		"e_serial_number_longer_than_20_octets",
+		"e_dnsname_bad_character_in_label",
+	} {
+		if cqrpMTCLeafRegistry.CertificateLints().ByName(name) == nil {
+			t.Errorf("compatible lint %s was excluded", name)
+		}
+	}
+}
+
+func TestMTCRegistrySelection(t *testing.T) {
+	for _, profile := range []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER} {
+		registry := registryForProfile(profile)
+		for _, source := range []lint.LintSource{
+			lint.CABFBaselineRequirements,
+			lint.CABFEVGuidelines,
+			lint.CABFSMIMEBaselineRequirements,
+			lint.CABFCSBaselineRequirements,
+		} {
+			if slices.Contains(registry.Sources(), source) {
+				t.Errorf("profile %s registry contains CABF source %s", linter.AllProfiles[profile].Name, source)
+			}
+		}
+	}
+	if got := registryForProfile(linter.CQRP_MTC_SUBSCRIBER); got != cqrpMTCLeafRegistry {
+		t.Fatal("CQRP MTC subscriber did not select the compatible CABF leaf registry")
+	}
+	if registryForProfile(linter.RFC5280_ROOT) != notCabforumRegistry {
+		t.Fatal("legacy non-CABF registry selection changed")
+	}
+}
+
+func TestCQRPAIAPresenceDelegatesToNativeEffectiveDateRule(t *testing.T) {
+	cert := syntheticZcryptoCertificate(t)
+	for _, notBefore := range []time.Time{
+		time.Date(2026, 10, 3, 23, 59, 59, 0, time.UTC),
+		time.Date(2026, 10, 4, 0, 0, 0, 0, time.UTC),
+	} {
+		cert.NotBefore = notBefore
+		results := (&Zlint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{
+			Cert: cert, ProfileId: linter.CQRP_MTC_SUBSCRIBER,
+		})
+		if hasFinding(results, "e_sub_cert_aia_missing") {
+			t.Errorf("CQRP MTC at %s used the obsolete unconditional AIA presence rule", notBefore)
+		}
+		registry := cabforumTLSLeafRegistry
+		if !hasFinding(lintCert(&linter.LintingRequest{Cert: cert}, &registry), "e_sub_cert_aia_missing") {
+			t.Errorf("ordinary CABF TLS leaf at %s lost its existing AIA presence rule", notBefore)
+		}
+	}
+}
+
+func TestCQRPAIACriticalAndOtherCompatibleChecksRemainEnabled(t *testing.T) {
+	cert := syntheticZcryptoCertificate(t)
+	cert.ExtensionsMap[util.AiaOID.String()] = zpkix.Extension{Id: util.AiaOID, Critical: true}
+	results := (&Zlint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{
+		Cert: cert, ProfileId: linter.CQRP_MTC_SUBSCRIBER,
+	})
+	if !hasFinding(results, "e_ext_aia_marked_critical") {
+		t.Fatal("CQRP MTC lost the compatible RFC 5280 critical AIA rejection")
+	}
+	for _, name := range defaultRegistry.CertificateLints().Names() {
+		if name != "e_sub_cert_aia_missing" && strings.Contains(name, "aia") &&
+			cabforumTLSLeafRegistry.CertificateLints().ByName(name) != nil &&
+			cqrpMTCLeafRegistry.CertificateLints().ByName(name) == nil {
+			t.Errorf("compatible AIA check %s was excluded", name)
+		}
+	}
+}
+
+func TestCQRPPolicyPresenceDelegatesToNative(t *testing.T) {
+	cert := syntheticZcryptoCertificate(t)
+	results := (&Zlint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{
+		Cert: cert, ProfileId: linter.CQRP_MTC_SUBSCRIBER,
+	})
+	for _, code := range []string{"e_sub_cert_certificate_policies_missing", "e_sub_cert_cert_policy_empty"} {
+		if hasFinding(results, code) {
+			t.Errorf("CQRP MTC did not delegate %s to native policy validation", code)
+		}
+		registry := cabforumTLSLeafRegistry
+		if !hasFinding(lintCert(&linter.LintingRequest{Cert: cert}, &registry), code) {
+			t.Errorf("ordinary CABF TLS leaf lost %s", code)
+		}
+	}
+}
+
+func TestDelegatedCQRPPoliciesStillRejectOrdinaryInvalidPolicies(t *testing.T) {
+	for _, tc := range []struct {
+		name, code string
+		extension  *mtctest.Extension
+	}{
+		{"missing", "e_cqrp_subscriber_policies_missing", nil},
+		{"empty", "e_cqrp_subscriber_policy_identifier", &mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: []byte{0x30, 0x00}}},
+		{"malformed", "e_cqrp_subscriber_policy_identifier", &mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Value: []byte{0x30, 0x02, 0x30, 0x00}}},
+		{"critical", "e_cqrp_subscriber_policies_critical", &mtctest.Extension{ID: mtctest.OIDCertificatePolicies, Critical: true, Value: mtctest.CertificatePoliciesDER(mtctest.OIDPolicyDV)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := mtctest.ValidCQRPSubscriberTemplate()
+			mtctest.RemoveExtension(&tpl, mtctest.OIDCertificatePolicies)
+			if tc.extension != nil {
+				mtctest.ReplaceExtension(&tpl, *tc.extension)
+			}
+			artifact, err := mtc.Parse(mtctest.TBSCertificate(tpl), mtc.InputTBSCertificate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, finding := range mtc.LintCQRP030(artifact) {
+				if finding.Code == tc.code && finding.Severity == mtc.Error {
+					return
+				}
+			}
+			t.Fatalf("ordinary certificate lost native error %s", tc.code)
+		})
+	}
+}
+
+func TestMTCProfilesRunCompatibleSerialLint(t *testing.T) {
+	cert := syntheticZcryptoCertificate(t)
+	cert.SerialNumber = new(big.Int).Lsh(big.NewInt(1), 160)
+
+	for _, profile := range []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER, linter.MTC_DRAFT06_CA, linter.MTC_DRAFT06_SUBSCRIBER, linter.MTC_DRAFT07_CA, linter.MTC_DRAFT07_SUBSCRIBER} {
+		results := (&Zlint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{
+			Cert:      cert,
+			ProfileId: profile,
+		})
+		if !hasFinding(results, "e_serial_number_longer_than_20_octets") {
+			t.Errorf("profile %s did not run the compatible serial-number lint", linter.AllProfiles[profile].Name)
+		}
+	}
+}
+
+func TestHandleRequestMTCNilCertificateDoesNotPanic(t *testing.T) {
+	for _, profile := range []linter.ProfileId{linter.MTC_CA, linter.MTC_SUBSCRIBER, linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER} {
+		if results := (&Zlint{}).HandleRequest(context.Background(), nil, &linter.LintingRequest{ProfileId: profile}); results != nil {
+			t.Errorf("profile %s results = %#v, want nil", linter.AllProfiles[profile].Name, results)
+		}
+	}
+	if results := (&Zlint{}).HandleRequest(context.Background(), nil, nil); results != nil {
+		t.Errorf("nil request results = %#v, want nil", results)
+	}
+}
+
+func syntheticZcryptoCertificate(t *testing.T) *x509.Certificate {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate test key: %v", err)
+	}
+	now := time.Date(2026, time.July, 1, 0, 0, 0, 0, time.UTC)
+	template := &cryptox509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "subscriber.example"},
+		DNSNames:              []string{"subscriber.example"},
+		NotBefore:             now,
+		NotAfter:              now.Add(24 * time.Hour),
+		KeyUsage:              cryptox509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []cryptox509.ExtKeyUsage{cryptox509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+	der, err := cryptox509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("failed to create test certificate: %v", err)
+	}
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatalf("zcrypto failed to parse test certificate: %v", err)
+	}
+	return cert
+}
 
 func testCRLDER(t *testing.T, thisUpdate, nextUpdate time.Time) []byte {
 	t.Helper()

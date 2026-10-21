@@ -21,4 +21,5 @@
 go.work
 
 .vscode/
+.worktrees/
 node_modules

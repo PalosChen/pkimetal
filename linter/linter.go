@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime/debug"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/pkimetal/pkimetal/config"
 	"github.com/pkimetal/pkimetal/logger"
+	"github.com/pkimetal/pkimetal/mtc"
 	"github.com/pkimetal/pkimetal/utils"
 
 	json "github.com/goccy/go-json"
@@ -36,7 +38,9 @@ type Linter struct {
 	Name                  string
 	Version               string
 	Url                   string
+	Supported             []ProfileId
 	Unsupported           []ProfileId
+	Applicable            func(*LintingRequest) (bool, string)
 	NumInstances          int
 	ReqChannel            chan LintingRequest
 	ReadySignal           string // If set, an external backend emits this line once it has finished initialising.
@@ -45,6 +49,41 @@ type Linter struct {
 	queueTimeSummary      prometheus.Summary
 	processingTimeSummary prometheus.Summary
 	Interface             func() LinterInterface
+}
+
+const (
+	unsupportedMTCProfileReason = "MTC profile is not explicitly supported"
+	nilLinterReason             = "linter is nil"
+	nilLintingRequestReason     = "linting request is nil"
+)
+
+func (l *Linter) Supports(profile ProfileId) bool {
+	if l == nil {
+		return false
+	}
+	if IsMTCProfile(profile) {
+		return slices.Contains(l.Supported, profile)
+	}
+	return !slices.Contains(l.Unsupported, profile)
+}
+
+func (l *Linter) EvaluateApplicability(req *LintingRequest) (bool, string) {
+	if l == nil {
+		return false, nilLinterReason
+	}
+	if req == nil {
+		return false, nilLintingRequestReason
+	}
+	if !l.Supports(req.ProfileId) {
+		if IsMTCProfile(req.ProfileId) {
+			return false, unsupportedMTCProfileReason
+		}
+		return false, ""
+	}
+	if l.Applicable != nil {
+		return l.Applicable(req)
+	}
+	return true, ""
 }
 
 type LinterSlice []*Linter
@@ -69,6 +108,7 @@ type LintingRequest struct {
 	B64Input       string
 	DecodedInput   []byte
 	Cert           *x509.Certificate
+	MTCArtifact    *mtc.Artifact
 	ProfileId      ProfileId
 	QueuedAt       time.Time
 	ChecksAdded    []string
@@ -528,6 +568,8 @@ func GetPackageVersion(packageNamePrefix string) string {
 func VersionString(version string) string {
 	if version == NOT_INSTALLED {
 		return "[" + version + "]"
+	} else if strings.HasPrefix(version, "draft-") {
+		return version
 	} else if strings.Contains(version, "-g") {
 		// git describe format: v0.0.0-0-gabcdef1
 		return version

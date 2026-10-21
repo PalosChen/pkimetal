@@ -129,6 +129,15 @@ const (
 	BIMIGROUP_LEAF_COMMONMARK_PRECERTIFICATE
 	BIMIGROUP_LEAF_VERIFIEDMARK
 	BIMIGROUP_LEAF_VERIFIEDMARK_PRECERTIFICATE
+	// Merkle Tree Certificates.
+	MTC_CA
+	MTC_SUBSCRIBER
+	CQRP_MTC_CA
+	CQRP_MTC_SUBSCRIBER
+	MTC_DRAFT06_CA
+	MTC_DRAFT06_SUBSCRIBER
+	MTC_DRAFT07_CA
+	MTC_DRAFT07_SUBSCRIBER
 )
 
 var (
@@ -246,6 +255,15 @@ var (
 		BIMIGROUP_LEAF_COMMONMARK_PRECERTIFICATE:   {Name: "bimigroup_leaf_commonmark_precertificate", Source: "Mark Certificate Guidelines", Description: "Common Mark Precertificate"},
 		BIMIGROUP_LEAF_VERIFIEDMARK:                {Name: "bimigroup_leaf_verifiedmark", Source: "Mark Certificate Guidelines", Description: "Verified Mark Certificate"},
 		BIMIGROUP_LEAF_VERIFIEDMARK_PRECERTIFICATE: {Name: "bimigroup_leaf_verifiedmark_precertificate", Source: "Mark Certificate Guidelines", Description: "Verified Mark Precertificate"},
+		// Merkle Tree Certificates.
+		MTC_CA:                 {Name: "mtc_ca", Source: "draft-ietf-plants-merkle-tree-certs-05", Description: "MTC Certification Authority Certificate"},
+		MTC_SUBSCRIBER:         {Name: "mtc_subscriber", Source: "draft-ietf-plants-merkle-tree-certs-05", Description: "MTC Subscriber Certificate"},
+		CQRP_MTC_CA:            {Name: "cqrp_mtc_ca", Source: "CQRP v0.3.0", Description: "CQRP MTC CA Cosigning Certificate"},
+		CQRP_MTC_SUBSCRIBER:    {Name: "cqrp_mtc_subscriber", Source: "CQRP v0.3.0", Description: "CQRP MTC Subscriber TLS Certificate"},
+		MTC_DRAFT06_CA:         {Name: "mtc_draft06_ca", Source: "draft-ietf-plants-merkle-tree-certs-06", Description: "MTC draft-06 Certification Authority Certificate"},
+		MTC_DRAFT06_SUBSCRIBER: {Name: "mtc_draft06_subscriber", Source: "draft-ietf-plants-merkle-tree-certs-06", Description: "MTC draft-06 Subscriber Certificate"},
+		MTC_DRAFT07_CA:         {Name: "mtc_draft07_ca", Source: "draft-ietf-plants-merkle-tree-certs-07", Description: "MTC draft-07 Certification Authority Certificate"},
+		MTC_DRAFT07_SUBSCRIBER: {Name: "mtc_draft07_subscriber", Source: "draft-ietf-plants-merkle-tree-certs-07", Description: "MTC draft-07 Subscriber Certificate"},
 	}
 
 	AllProfilesOrdered                                                               []Profile
@@ -317,9 +335,18 @@ func ProfileIDList(list []ProfileId) string {
 	return s.String()[1:]
 }
 
+func IsMTCProfile(profile ProfileId) bool {
+	switch profile {
+	case MTC_CA, MTC_SUBSCRIBER, CQRP_MTC_CA, CQRP_MTC_SUBSCRIBER, MTC_DRAFT06_CA, MTC_DRAFT06_SUBSCRIBER, MTC_DRAFT07_CA, MTC_DRAFT07_SUBSCRIBER:
+		return true
+	default:
+		return false
+	}
+}
+
 func registerLinterWithProfiles(linter *Linter) {
 	for id, profile := range AllProfiles {
-		if !slices.Contains(linter.Unsupported, id) {
+		if linter.Supports(id) {
 			profile.Linters = append(profile.Linters, &linter.Name)
 			AllProfiles[id] = profile
 		}
