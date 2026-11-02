@@ -25,8 +25,8 @@ func TestRegistration(t *testing.T) {
 		t.Fatalf("cqrplint registrations = %d, want 1", len(registered))
 	}
 	got := registered[0]
-	if got.Version != "v0.3.0" {
-		t.Errorf("version = %q, want v0.3.0", got.Version)
+	if got.Version != "v0.4.0" {
+		t.Errorf("version = %q, want v0.4.0", got.Version)
 	}
 	if got.Url != "https://googlechrome.github.io/chromerootprogram/cqrp/draft-policy/" {
 		t.Errorf("URL = %q", got.Url)
@@ -67,7 +67,7 @@ func TestProfilesHandleValidArtifactsAndMutations(t *testing.T) {
 		mutate   func(*mtctest.Template)
 		wantCode string
 	}{
-		{"CA", linter.CQRP_MTC_CA, mtctest.ValidCQRPCATemplate(), func(tpl *mtctest.Template) { tpl.SPKIAlgorithm.OID = mtctest.OIDMLDSA65 }, "e_cqrp_ca_spki_algorithm"},
+		{"CA", linter.CQRP_MTC_CA, mtctest.ValidCQRP040CATemplate(), func(tpl *mtctest.Template) { tpl.SPKIAlgorithm.OID = mtctest.OIDMLDSA65 }, "e_cqrp_ca_spki_algorithm"},
 		{"subscriber", linter.CQRP_MTC_SUBSCRIBER, mtctest.ValidCQRPSubscriberTemplate(), func(tpl *mtctest.Template) { tpl.NotAfter = tpl.NotBefore.Add(48 * 24 * time.Hour) }, "e_cqrp_subscriber_validity_too_long"},
 	}
 	for _, tc := range tests {
@@ -89,6 +89,25 @@ func TestHandlerReturnsOnlyCQRPPolicyFindings(t *testing.T) {
 	assertHasCode(t, results, "e_cqrp_subscriber_validity_too_long")
 	assertLacksCode(t, results, "e_mtc_serial_log_number_zero")
 	assertLacksCode(t, results, "e_mtc_profile_artifact_mismatch")
+}
+
+func TestCurrentProfileAcceptsLogFiveAndRejectsLogSix(t *testing.T) {
+	for _, logNumber := range []uint64{5, 6} {
+		tpl := mtctest.ValidCQRPSubscriberTemplate()
+		tpl.Serial.SetUint64(logNumber<<48 | 7)
+		results := handle(t, linter.CQRP_MTC_SUBSCRIBER, parseArtifact(t, tpl, mtc.InputCertificate))
+		if logNumber == 5 {
+			assertLacksCode(t, results, "e_cqrp_subscriber_log_number_not_trusted")
+		} else {
+			assertHasCode(t, results, "e_cqrp_subscriber_log_number_not_trusted")
+		}
+	}
+}
+
+func TestCurrentCAProfileRequiresCrlSign(t *testing.T) {
+	tpl := mtctest.ValidCQRPCATemplate()
+	results := handle(t, linter.CQRP_MTC_CA, parseArtifact(t, tpl, mtc.InputCertificate))
+	assertHasCode(t, results, "e_cqrp_ca_key_usage_missing_crl_sign")
 }
 
 func TestSubscriberProfileAlwaysRunsCABFSANRules(t *testing.T) {
@@ -125,7 +144,7 @@ func TestCQRPCARequiresMTCTlogExactlyOnceAndSubscriberDoesNot(t *testing.T) {
 	results := handle(t, linter.CQRP_MTC_CA, parseArtifact(t, missing, mtc.InputCertificate))
 	assertCodeCount(t, results, "e_cqrp_ca_mtc_tlog_extension_missing", 1)
 
-	valid := mtctest.ValidCQRPCATemplate()
+	valid := mtctest.ValidCQRP040CATemplate()
 	results = handle(t, linter.CQRP_MTC_CA, parseArtifact(t, valid, mtc.InputCertificate))
 	for _, code := range mtc.MTCTlogRuleCodes() {
 		assertLacksCode(t, results, code)

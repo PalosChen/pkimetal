@@ -14,7 +14,7 @@ type CQRPLint struct{}
 func init() {
 	(&linter.Linter{
 		Name:         "cqrplint",
-		Version:      "v0.3.0",
+		Version:      "v0.4.0",
 		Url:          "https://googlechrome.github.io/chromerootprogram/cqrp/draft-policy/",
 		Supported:    []linter.ProfileId{linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER},
 		Unsupported:  mtcadapter.UnsupportedProfiles(linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER),
@@ -43,7 +43,7 @@ func (l *CQRPLint) HandleRequest(_ context.Context, _ *linter.LinterInstance, re
 	default:
 		return nil
 	}
-	results := mtcadapter.ConvertFindings(mtc.LintCQRP030ForKind(req.MTCArtifact, expected))
+	results := mtcadapter.ConvertFindings(mtc.LintCQRP040ForKind(req.MTCArtifact, expected))
 	if req.ProfileId == linter.CQRP_MTC_SUBSCRIBER {
 		results = append(results, mtcadapter.ConvertFindings(mtc.LintCABFTLSSubscriberForKind(req.MTCArtifact, expected))...)
 	}

@@ -1,5 +1,20 @@
 # MTC Linting Specification Baseline
 
+## CQRP v0.4.0 Lint Profile (2026-11-02)
+
+The registered `cqrplint` profile selects official **[DRAFT] CQRP v0.4.0
+(RC 1.0.0)**, updated 2026-10-28:
+https://googlechrome.github.io/chromerootprogram/cqrp/draft-policy/ . Retrieved
+HTML SHA-256:
+`ed6f507dc46dfab72ec4baa19e9307bbbecfdda57112ada2a344fe2bc2dd8348`.
+The retained `LintCQRP030` API and v0.3.0 sections below preserve historical
+evaluation. Normative delta for locally decidable rules: §2.4.3.1 now requires
+CA keyUsage to include cRLSign; §2.5.1.3 allows Log/N 5 but rejects 6 and
+higher. Other certificate-local checks remain applicable. MTC/TAI and C2SP
+pins, profile IDs, wire format and dependencies do not change. Network,
+registry, key/HSM, publication, ARI and availability obligations need external
+evidence and are not certified by this lint profile.
+
 ## Reviewed standards update (2026-10-19)
 
 This delivery explicitly adopts TLS BR **2.3.1**, effective **2026-10-04**,
@@ -197,12 +212,12 @@ identity are not locally decidable certificate lints.
 
 ## CQRP Overlay
 
-The `cqrp_mtc_ca` and `cqrp_mtc_subscriber` profiles are pinned to official
-`CQRP v0.3.0` (2026-08-14). CQRP is an explicit policy assertion, not an encoding
+The `cqrp_mtc_ca` and `cqrp_mtc_subscriber` profiles select official draft
+`CQRP v0.4.0` (2026-10-28). CQRP is an explicit policy assertion, not an encoding
 that autodetection may infer. Both profiles retain their IDs and choose the
 native MTC-05/06/07 rules and proof parser from unambiguous artifact identity.
-The official original-source hashes and qualification boundaries are recorded
-below.
+The current source hash is recorded above; the v0.3.0 source and qualification
+boundary below remain historical compatibility evidence.
 
 CQRP overrides MTC, RFC 5280 or TLS BR requirements only where the pinned CQRP
 text explicitly does so.

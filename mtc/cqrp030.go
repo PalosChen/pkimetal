@@ -296,19 +296,19 @@ func LintCQRP030ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
 }
 
 // LintCQRP020 retains the historical exported name for source compatibility.
-// Deprecated: use LintCQRP030. This alias evaluates the current v0.3.0 policy.
+// Deprecated: use LintCQRP030. This alias evaluates the retained v0.3.0 policy.
 func LintCQRP020(artifact *Artifact) []Finding {
 	return LintCQRP030(artifact)
 }
 
 // CQRP020RuleCodes retains the historical exported name for source compatibility.
-// Deprecated: use CQRP030RuleCodes. This alias lists the current v0.3.0 rules.
+// Deprecated: use CQRP030RuleCodes. This alias lists the retained v0.3.0 rules.
 func CQRP020RuleCodes() []string {
 	return CQRP030RuleCodes()
 }
 
 // LintCQRP020ForKind retains the historical exported name for source compatibility.
-// Deprecated: use LintCQRP030ForKind. This alias evaluates the current v0.3.0 policy.
+// Deprecated: use LintCQRP030ForKind. This alias evaluates the retained v0.3.0 policy.
 func LintCQRP020ForKind(artifact *Artifact, expected ArtifactKind) []Finding {
 	return LintCQRP030ForKind(artifact, expected)
 }

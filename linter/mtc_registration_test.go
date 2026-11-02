@@ -26,7 +26,7 @@ func TestMTCPolicyLintersRegisterPublicMetadata(t *testing.T) {
 		},
 		{
 			name:             "cqrplint",
-			formattedVersion: "v0.3.0",
+			formattedVersion: "v0.4.0",
 			url:              "https://googlechrome.github.io/chromerootprogram/cqrp/draft-policy/",
 			supported:        []linter.ProfileId{linter.CQRP_MTC_CA, linter.CQRP_MTC_SUBSCRIBER},
 		},

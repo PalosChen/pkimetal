@@ -204,6 +204,12 @@ func ValidCQRPCATemplate() Template {
 	return tpl
 }
 
+func ValidCQRP040CATemplate() Template {
+	tpl := ValidCQRPCATemplate()
+	ReplaceExtension(&tpl, Extension{ID: OIDKeyUsage, Critical: true, Value: KeyUsageBitsDER(0x0400 | 0x0200)})
+	return tpl
+}
+
 func ValidProof() Proof {
 	return Proof{Start: 0, End: 8}
 }

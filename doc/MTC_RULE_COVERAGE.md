@@ -18,13 +18,23 @@ no KEM exception is implemented in the linter. CA's separately validated
 experimental KEM branch retains its two existing exact native finding
 exceptions; ordinary issuance has none.
 
+The default CQRP lint profile now uses pinned CQRP v0.4.0 (2026-10-28).
+It trusts Log numbers 1 through 5 under §2.5.1.3 and requires CA KeyUsage
+to contain both keyCertSign and cRLSign under §2.4.3.1. The v0.4.0 overlay
+reports `e_cqrp_ca_key_usage_missing_crl_sign` or
+`e_cqrp_ca_key_usage_missing_key_cert_sign` when either bit is absent.
+The rule matrix below documents the retained v0.3.0 API and its metadata;
+the current overlay inherits those checks with v0.4.0 source attribution
+and the stated changes. Operational integrity stops under §2.5.2 are
+enforced by the Log service, outside this certificate linter.
+
 This fork implements explicit draft-07 with retained draft-06/draft-05 experimental MTC linting.
 Profiles 105-108 retain their names and meanings; 109 is `mtc_draft06_ca` and
 110 is `mtc_draft06_subscriber`; 111/112 are `mtc_draft07_ca` and
 `mtc_draft07_subscriber`. Complete certificates and TBS artifacts are
 supported; proof/outer-certificate rules do not apply to TBS inputs. The legacy
-MTC matrix below describes retained draft-05 findings; the CQRP v0.3.0 overlay
-applies to unambiguous draft-05, draft-06 and draft-07 artifacts.
+MTC matrix below describes retained draft-05 findings; CQRP overlays apply
+to unambiguous draft-05, draft-06 and draft-07 artifacts.
 
 The retained profile implements Merkle Tree Certificate (MTC) linting against
 [draft-ietf-plants-merkle-tree-certs-05](https://datatracker.ietf.org/doc/html/draft-ietf-plants-merkle-tree-certs-05),
@@ -142,14 +152,14 @@ successful.
 Linting is offline and structural. It cannot infer the Merkle hash size from a
 subscriber certificate; validate inclusion roots, proof hashes, or
 cosignatures; compare an external log entry; establish signer/operator roles or
-their independence; or query Chrome registries. CQRP's conditional `cRLSign`
-requirements depend on external CA role and CRL behavior and are outside local
-certificate scope. RFC 9925 checks are conditional on the unsigned algorithm and
+their independence; or query Chrome registries. CQRP v0.4.0's unconditional
+CA `cRLSign` requirement is checked by the current CQRP profile. RFC 9925
+checks are conditional on the unsigned algorithm and
 cover matching algorithm identifiers, absent parameters, an empty outer
 signature, absent issuerUniqueID, and warnings for authorityKeyIdentifier or
 issuerAltName.
 
-CQRP §2.5.1.3 rejects subscriber log numbers above 4 in Certificate and TBS
+CQRP v0.4.0 §2.5.1.3 rejects subscriber log numbers above 5 in Certificate and TBS
 inputs. §2.4.5 proof checks use vector16 for draft-05 and vector24 for draft-06/07;
 TBS inputs do not have a proof. The signature-count finding applies only to
 05/06; 07 cannot classify form with GREASE. Legacy count is structural evidence only:

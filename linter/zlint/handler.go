@@ -116,7 +116,7 @@ SubscriberCRL = false
 			// enforces AIA presence at its 2026-10-04 effective-date boundary.
 			// ZLint's unconditional presence error predates that change.
 			"e_sub_cert_aia_missing",
-			// CQRP v0.3.0 section 2.4.3.2: native cqrplint validates
+			// CQRP v0.4.0 section 2.4.3.2: native cqrplint validates
 			// policy presence, criticality and exactly one reserved identifier.
 			"e_sub_cert_certificate_policies_missing",
 			"e_sub_cert_cert_policy_empty",
