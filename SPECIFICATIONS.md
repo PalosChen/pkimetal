@@ -1,5 +1,15 @@
 # MTC Linting Specification Baseline
 
+## Seven-day CRL policy review (2026-11-22)
+
+MTC draft-08 §12.7 and CQRP v0.4.0 do not define a seven-day CRL exemption.
+BR v2.3.1 still permits the CDP extension to be omitted for Short-lived
+Subscriber Certificates. The native BR lint rule therefore retains that
+standards-level optionality, while CA issuance separately enforces this
+deployment's stricter policy that all newly issued seven-day and 47-day
+certificates use a published CRL. This lint-level optionality does not authorize
+the project's seven-day issuance path to omit CRL publication.
+
 ## CQRP v0.4.0 Lint Profile (2026-11-02)
 
 The registered `cqrplint` profile selects official **[DRAFT] CQRP v0.4.0
@@ -139,7 +149,7 @@ certificate-local and explicit; a URL never selects a lint profile.
 
 CA representations and CRL issuer/publication state are revision-separated for
 the same identity/key. Preserve old CA/CRL URLs and original artifact chains;
-47d admission needs the new CRL view, while 7d retains its no-CRL policy.
+7d and 47d admission both require the matching revision-bound CRL view.
 
 Enable 06 only after durable expiration/history evidence is complete, the
 configured lifetime bound is positive, approved full CA prefixes map BEFORE
