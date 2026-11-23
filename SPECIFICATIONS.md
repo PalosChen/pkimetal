@@ -7,8 +7,12 @@ BR v2.3.1 still permits the CDP extension to be omitted for Short-lived
 Subscriber Certificates. The native BR lint rule therefore retains that
 standards-level optionality, while CA issuance separately enforces this
 deployment's stricter policy that all newly issued seven-day and 47-day
-certificates use a published CRL. This lint-level optionality does not authorize
-the project's seven-day issuance path to omit CRL publication.
+certificates use a published CRL. This is a current product policy. A future
+seven-day profile revision may remove the CRL URL only after root-program,
+client-compatibility and operational validation, with a separate checklist and
+public notice. No removal date is committed. This lint-level optionality does
+not authorize the project's current seven-day issuance path to omit CRL
+publication.
 
 ## CQRP v0.4.0 Lint Profile (2026-11-02)
 
